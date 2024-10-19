@@ -1,0 +1,8 @@
+[package]
+name = "algo_gui"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+console_engine = "2.6.1"
+termsize = "0.1.9"
