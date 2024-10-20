@@ -8,10 +8,17 @@ mod helpers {
     pub mod engine_helpers;
 }
 
+mod data {
+    pub mod data_structures;
+}
+
 mod menu {
     pub mod button;
+    pub mod dropdown;
+    pub mod form;
     pub mod main_menu;
     pub mod maze_menu;
+    pub mod maze_scene;
     pub mod menu;
     pub mod pathfinding_menu;
     pub mod sort_menu;

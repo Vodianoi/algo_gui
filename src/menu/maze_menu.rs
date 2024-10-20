@@ -1,21 +1,46 @@
 use crate::algorithms::maze_generation::*;
-use std::thread;
 
-pub fn run_maze_menu() {
+use crate::menu::dropdown::DropDown;
+use console_engine::ConsoleEngine;
+use console_engine::KeyCode;
+
+pub fn run_maze_menu(engine: &mut ConsoleEngine) {
     let maze_items = vec![
-        "Recursive Backtracker", "Randomized Prim's Algorithm", "Randomized Kruskal's Algorithm",
-        "Randomized Eller's Algorithm", "Hunt-and-Kill Algorithm", "Aldous-Broder Algorithm", "Wilson's Algorithm"
+        "Recursive Backtracker".to_string(),
+        "Prim's Algorithm".to_string(),
+        "Kruskal's Algorithm".to_string(),
+        "Eller's Algorithm".to_string(),
+        "Hunt and Kill".to_string(),
+        "Aldous-Broder".to_string(),
+        "Wilson's Algorithm".to_string(),
+        "Confirm".to_string(),
     ];
 
-    println!("Maze Generation Algorithms Menu:");
-    for (i, item) in maze_items.iter().enumerate() {
-        println!("{}. {}", i + 1, item);
+    let mut maze_menu = DropDown::new(10, 10, 20, maze_items);
+    loop {
+        engine.wait_frame();
+        engine.clear_screen();
+        maze_menu.draw(engine);
+
+        if engine.is_key_pressed(KeyCode::Char('q')) {
+            break;
+        }
+
+        maze_menu.update(engine);
+
+        if maze_menu.confirmed {
+            match maze_menu.selected {
+                0 => recursive_backtracker(),
+                1 => prim_algorithm(),
+                2 => kruskal_algorithm(engine),
+                3 => eller_algorithm(),
+                4 => hunt_and_kill(),
+                5 => aldous_broder(),
+                6 => wilson_algorithm(),
+                _ => (),
+            }
+        }
+
+        engine.draw();
     }
-
-    let handle = thread::spawn(move || {
-        recursive_backtracker();
-    });
-
-    handle.join().unwrap();
 }
-

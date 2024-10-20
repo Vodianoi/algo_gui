@@ -27,7 +27,7 @@ impl Menu {
     }
     pub fn draw(&self, engine: &mut console_engine::ConsoleEngine) {
         for (i, item) in self.items.iter().enumerate() {
-            let mut button = Button::new(self.x, self.y + (i as i32) * 10, self.w, self.h, item);
+            let mut button = Button::new(self.x, self.y + (i as i32) * 5, self.w, self.h, item);
             if self.selected == i {
                 button.selected = true;
             }
