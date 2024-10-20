@@ -12,6 +12,8 @@ pub struct Maze {
     pub width: usize,
     pub height: usize,
     pub cells: Vec<Vec<Cell>>,
+    pub start: (i32, i32),
+    pub goal: (i32, i32),
 }
 
 impl Maze {
@@ -21,7 +23,7 @@ impl Maze {
             let mut row = Vec::new();
             for x in 0..width {
                 let value: i32 = x as i32 + y as i32;
-                row.push(Cell::new(value));
+                row.push(Cell::new(value, EMPTY_CHAR));
             }
             cells.push(row);
         }
@@ -30,6 +32,8 @@ impl Maze {
             width,
             height,
             cells,
+            start: (1, 1),
+            goal: (width as i32 - 2, height as i32 - 2),
         }
     }
 
@@ -68,11 +72,8 @@ impl Maze {
         let mut walls = Vec::new();
         for y in 0..self.height {
             for x in 0..self.width {
-                if y > 0 {
-                    walls.push((x as i32, y as i32 - 1));
-                }
-                if x > 0 {
-                    walls.push((x as i32 - 1, y as i32));
+                if self.get_cell(x as i32, y as i32).c == WALL_CHAR {
+                    walls.push((x as i32, y as i32));
                 }
             }
         }
@@ -86,21 +87,23 @@ impl Maze {
     }
 
     pub fn remove_wall(&mut self, x: i32, y: i32, nx: i32, ny: i32) {
-        if x == nx {
-            if y > ny {
-                self.get_cell_mut(x, y).walls[0] = false;
-                self.get_cell_mut(nx, ny).walls[2] = false;
-            } else {
-                self.get_cell_mut(x, y).walls[2] = false;
-                self.get_cell_mut(nx, ny).walls[0] = false;
-            }
-        } else if x > nx {
-            self.get_cell_mut(x, y).walls[3] = false;
-            self.get_cell_mut(nx, ny).walls[1] = false;
-        } else {
+        let dx = nx - x;
+        let dy = ny - y;
+        if dx == 1 {
             self.get_cell_mut(x, y).walls[1] = false;
             self.get_cell_mut(nx, ny).walls[3] = false;
+        } else if dx == -1 {
+            self.get_cell_mut(x, y).walls[3] = false;
+            self.get_cell_mut(nx, ny).walls[1] = false;
+        } else if dy == 1 {
+            self.get_cell_mut(x, y).walls[2] = false;
+            self.get_cell_mut(nx, ny).walls[0] = false;
+        } else if dy == -1 {
+            self.get_cell_mut(x, y).walls[0] = false;
+            self.get_cell_mut(nx, ny).walls[2] = false;
         }
+
+        self.get_cell_mut(x, y).c = EMPTY_CHAR;
     }
 
     pub fn set_cell(&mut self, x: i32, y: i32, value: i32) {
@@ -120,6 +123,8 @@ impl Maze {
             width: self.width,
             height: self.height,
             cells,
+            start: self.start,
+            goal: self.goal,
         }
     }
 }
@@ -128,14 +133,16 @@ pub struct Cell {
     pub walls: [bool; 4],
     pub visited: bool,
     pub value: i32,
+    pub c: char,
 }
 
 impl Cell {
-    pub fn new(value: i32) -> Cell {
+    pub fn new(value: i32, c: char) -> Cell {
         Cell {
             walls: [true, true, true, true],
             visited: false,
             value,
+            c,
         }
     }
 
@@ -143,8 +150,9 @@ impl Cell {
         self.visited
     }
 
-    pub fn visit(&mut self) {
+    pub fn visit(&mut self, value: i32) {
         self.visited = true;
+        self.value = value;
     }
 
     pub fn operator_eq(&self, other: &Cell) -> bool {
@@ -160,6 +168,20 @@ impl Cell {
             walls: self.walls,
             visited: self.visited,
             value: self.value,
+            c: self.c,
         }
+    }
+
+    pub fn has_wall_north(&self) -> bool {
+        self.walls[0]
+    }
+    pub fn has_wall_south(&self) -> bool {
+        self.walls[1]
+    }
+    pub fn has_wall_west(&self) -> bool {
+        self.walls[2]
+    }
+    pub fn has_wall_east(&self) -> bool {
+        self.walls[3]
     }
 }

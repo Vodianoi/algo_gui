@@ -21,12 +21,11 @@ pub fn run_maze_menu(engine: &mut ConsoleEngine) {
         engine.wait_frame();
         engine.clear_screen();
         maze_menu.draw(engine);
+        maze_menu.update(engine);
 
         if engine.is_key_pressed(KeyCode::Char('q')) {
             break;
         }
-
-        maze_menu.update(engine);
 
         if maze_menu.confirmed {
             match maze_menu.selected {
@@ -39,6 +38,7 @@ pub fn run_maze_menu(engine: &mut ConsoleEngine) {
                 6 => wilson_algorithm(),
                 _ => (),
             }
+            maze_menu.confirmed = false;
         }
 
         engine.draw();
