@@ -27,6 +27,16 @@ mod menu {
     pub mod theme;
 }
 
+mod tests {
+    #[cfg(test)]
+    mod tests {
+        #[test]
+        fn test() {
+            assert_eq!(1, 1);
+        }
+    }
+}
+
 fn main() {
     menu::main_menu::main_menu();
 }

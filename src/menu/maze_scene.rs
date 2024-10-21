@@ -2,6 +2,10 @@
 
 use crate::data::data_structures::Cell;
 use crate::data::data_structures::Maze;
+
+use std::thread;
+use std::time;
+
 pub const EMPTY_CHAR: char = ' ';
 pub const WALL_CHAR: char = '#';
 pub const PATH_CHAR: char = ' ';
@@ -10,7 +14,7 @@ pub const GOAL_CHAR: char = 'G';
 pub const START_CHAR: char = 'S';
 
 pub const WALL_COLOR: Color = Color::White;
-pub const PATH_COLOR: Color = Color::Red;
+pub const PATH_COLOR: Color = Color::Black;
 pub const VISITED_COLOR: Color = Color::Green;
 pub const START_COLOR: Color = Color::Red;
 pub const GOAL_COLOR: Color = Color::Blue;
@@ -41,22 +45,6 @@ impl MazeScene {
             color_visited: VISITED_COLOR,
         }
     }
-
-    // Draw the maze scene
-    // This function is called in a loop to animate the maze generation algorithm
-    // It draws the maze cells and the visited
-    // 2 modes :
-    //  - Draw the maze with cells as characters
-    //  - Draw the maze with cells as colored pixels
-    //
-    //  since the maze is a grid of cells, we need to draw each cell
-    //  walls are boolean values (n,s, e, w) that indicates if the cell has a wall in the direction
-    //  We need to add more logic to draw the walls
-    //  if the cell has a wall in the north direction, we need to draw a wall on the top of the cell
-    //  if the cell has a wall in the south direction, we need to draw a wall on the bottom of the cell
-    //  if the cell has a wall in the east direction, we need to draw a wall on the right of the cell
-    //  if the cell has a wall in the west direction, we need to draw a wall on the left of the cell
-    //  All this only if there is not already a wall in the direction
     pub fn draw(
         &self,
         engine: &mut console_engine::ConsoleEngine,
@@ -65,7 +53,7 @@ impl MazeScene {
         shortest_path: Vec<Cell>,
         BFS: bool,
     ) {
-        // Adjust the maze dimensions to include walls (same concept as adding rows/cols in Python)
+        // Adjust the maze dimensions to include walls
         let new_width = self.maze.width * 2 + 1;
         let new_height = self.maze.height * 2 + 1;
 
@@ -81,24 +69,24 @@ impl MazeScene {
                 let draw_y = y * 2 + 1;
 
                 // Draw walls if needed
-                if cell.has_wall_north() {
-                    laby_with_walls[draw_y - 1][draw_x] = WALL_CHAR;
+                if !cell.has_wall_north() && draw_y > 0 {
+                    laby_with_walls[draw_y - 1][draw_x] = cell.c;
                 }
-                if cell.has_wall_south() {
-                    laby_with_walls[draw_y + 1][draw_x] = WALL_CHAR;
+                if !cell.has_wall_south() && draw_y < new_height - 1 {
+                    laby_with_walls[draw_y + 1][draw_x] = cell.c;
                 }
-                if cell.has_wall_west() {
-                    laby_with_walls[draw_y][draw_x - 1] = WALL_CHAR;
+                if !cell.has_wall_west() && draw_x > 0 {
+                    laby_with_walls[draw_y][draw_x - 1] = cell.c;
                 }
-                if cell.has_wall_east() {
-                    laby_with_walls[draw_y][draw_x + 1] = WALL_CHAR;
+                if !cell.has_wall_east() && draw_x < new_width - 1 {
+                    laby_with_walls[draw_y][draw_x + 1] = cell.c;
                 }
 
                 // Mark visited cells or path
                 if cell.visited {
                     laby_with_walls[draw_y][draw_x] = VISITED_CHAR;
                 } else {
-                    laby_with_walls[draw_y][draw_x] = PATH_CHAR;
+                    laby_with_walls[draw_y][draw_x] = EMPTY_CHAR;
                 }
             }
         }
@@ -111,17 +99,17 @@ impl MazeScene {
                 let pixel_char;
                 // Draw based on mode (colored or not)
                 if colored {
+                    pixel_char = match ch {
+                        WALL_CHAR => pixel::pxl_bg(' ', self.color_wall),
+                        VISITED_CHAR => pixel::pxl_bg(' ', self.color_visited),
+                        _ => pixel::pxl_bg(' ', self.color_path),
+                    };
+                } else {
                     // Use different colors based on content
                     pixel_char = match ch {
                         WALL_CHAR => pixel::pxl_fg(WALL_CHAR, self.color_wall),
                         VISITED_CHAR => pixel::pxl_fg(VISITED_CHAR, self.color_visited),
                         _ => pixel::pxl_fg(PATH_CHAR, self.color_path),
-                    };
-                } else {
-                    pixel_char = match ch {
-                        WALL_CHAR => pixel::pxl_bg(' ', self.color_wall),
-                        VISITED_CHAR => pixel::pxl_bg(' ', self.color_visited),
-                        _ => pixel::pxl_bg(' ', self.color_path),
                     };
                 }
                 for i in 0..self.cell_size {

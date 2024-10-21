@@ -1,5 +1,9 @@
 // Maze data structure
 use rand::Rng;
+use std::{
+    fmt::{Debug, Display, Formatter, Result},
+    io::Write,
+};
 
 pub const EMPTY_CHAR: char = ' ';
 pub const WALL_CHAR: char = '#';
@@ -23,7 +27,7 @@ impl Maze {
             let mut row = Vec::new();
             for x in 0..width {
                 let value: i32 = x as i32 + y as i32;
-                row.push(Cell::new(value, EMPTY_CHAR));
+                row.push(Cell::new(value, WALL_CHAR));
             }
             cells.push(row);
         }
@@ -90,20 +94,21 @@ impl Maze {
         let dx = nx - x;
         let dy = ny - y;
         if dx == 1 {
-            self.get_cell_mut(x, y).walls[1] = false;
-            self.get_cell_mut(nx, ny).walls[3] = false;
-        } else if dx == -1 {
             self.get_cell_mut(x, y).walls[3] = false;
-            self.get_cell_mut(nx, ny).walls[1] = false;
-        } else if dy == 1 {
+            self.get_cell_mut(nx, ny).walls[2] = false;
+        } else if dx == -1 {
             self.get_cell_mut(x, y).walls[2] = false;
+            self.get_cell_mut(nx, ny).walls[3] = false;
+        } else if dy == 1 {
+            self.get_cell_mut(x, y).walls[1] = false;
             self.get_cell_mut(nx, ny).walls[0] = false;
         } else if dy == -1 {
             self.get_cell_mut(x, y).walls[0] = false;
-            self.get_cell_mut(nx, ny).walls[2] = false;
+            self.get_cell_mut(nx, ny).walls[1] = false;
         }
-
-        self.get_cell_mut(x, y).c = EMPTY_CHAR;
+        let cell = self.get_cell_mut(x, y);
+        cell.c = EMPTY_CHAR;
+        cell.value = x + y;
     }
 
     pub fn set_cell(&mut self, x: i32, y: i32, value: i32) {
@@ -126,6 +131,57 @@ impl Maze {
             start: self.start,
             goal: self.goal,
         }
+    }
+
+    pub fn save_to_file(&self, path: &str) {
+        let mut file = std::fs::File::create(path).unwrap();
+        let mut content = String::new();
+        for y in 0..self.height {
+            for x in 0..self.width {
+                content.push(self.cells[y][x].c);
+            }
+            content.push('\n');
+        }
+        file.write_all(content.as_bytes()).unwrap();
+    }
+}
+
+impl Display for Maze {
+    fn fmt(&self, f: &mut Formatter) -> Result {
+        let mut output = String::new();
+        for y in 0..self.height {
+            for x in 0..self.width {
+                output.push(self.cells[y][x].c);
+            }
+            output.push('\n');
+        }
+        write!(f, "{}", output)
+    }
+}
+
+impl Debug for Maze {
+    fn fmt(&self, f: &mut Formatter) -> Result {
+        let mut output = String::new();
+
+        // Output percentage of WALL_CHAR in the maze
+        let mut wall_count = 0;
+        for y in 0..self.height {
+            for x in 0..self.width {
+                let cell = &self.cells[y][x];
+                for wall in &cell.walls {
+                    if *wall {
+                        wall_count += 1;
+                    }
+                }
+            }
+        }
+        let total_cells = self.width * self.height * 4;
+        let wall_percentage = (wall_count as f32 / total_cells as f32) * 100.0;
+        output.push_str(&format!(
+            "Maze ({}x{}) with {}% walls\n",
+            self.width, self.height, wall_percentage
+        ));
+        write!(f, "{}", output)
     }
 }
 

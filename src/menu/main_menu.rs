@@ -13,7 +13,7 @@ pub fn main_menu() {
     let screen_height = rows as u32;
 
     // Initialize the console engine with the full terminal size and 60 FPS
-    let mut engine = ConsoleEngine::init(screen_width, screen_height, 60).unwrap();
+    let mut engine = ConsoleEngine::init(screen_width, screen_height, 240).unwrap();
 
     // Define the main menu options
     let menu_items = vec![
