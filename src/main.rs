@@ -20,8 +20,11 @@ mod menu {
     pub mod maze_menu;
     pub mod maze_scene;
     pub mod menu;
+    pub mod menu_handler;
+    pub mod menu_trait;
     pub mod pathfinding_menu;
     pub mod sort_menu;
+    pub mod theme;
 }
 
 fn main() {

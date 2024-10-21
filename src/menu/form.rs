@@ -4,6 +4,8 @@
 use console_engine::pixel;
 use console_engine::Color;
 
+use crate::menu::menu_trait::MenuTrait;
+
 use crate::menu::button::Button;
 use crate::menu::button::CheckBox;
 
@@ -14,20 +16,12 @@ pub struct Form {
     pub h: i32,
     pub fields: Vec<String>,
     pub selected: usize,
+    pub confirmed: bool,
+    pub _quit: bool,
 }
 
-impl Form {
-    pub fn new(x: i32, y: i32, w: i32, h: i32, fields: Vec<&str>) -> Form {
-        Form {
-            x,
-            y,
-            w,
-            h,
-            fields: fields.iter().map(|s| s.to_string()).collect(),
-            selected: 0,
-        }
-    }
-    pub fn draw(&self, engine: &mut console_engine::ConsoleEngine) {
+impl MenuTrait for Form {
+    fn draw(&mut self, engine: &mut console_engine::ConsoleEngine) {
         for (i, field) in self.fields.iter().enumerate() {
             let mut checkbox =
                 CheckBox::new(self.x, self.y + (i as i32) * 5, self.w, self.h, field);
@@ -37,15 +31,46 @@ impl Form {
             checkbox.draw(engine);
         }
     }
-    pub fn next(&mut self) {
+
+    fn next(&mut self) {
         self.selected = (self.selected + 1) % self.fields.len();
     }
-    pub fn previous(&mut self) {
+
+    fn previous(&mut self) {
         if self.selected == 0 {
             self.selected = self.fields.len() - 1;
         } else {
             self.selected -= 1;
         }
+    }
+
+    fn select(&self) -> Option<String> {
+        Some(self.fields[self.selected].clone())
+    }
+
+    fn get_selected(&self) -> usize {
+        self.selected
+    }
+
+    fn should_quit(&self) -> bool {
+        self._quit
+    }
+
+    fn handle_key_event(&mut self, engine: &mut console_engine::ConsoleEngine) {
+        if engine.is_key_pressed(console_engine::KeyCode::Char('q')) {
+            self._quit = true;
+        }
+        if engine.is_key_pressed(console_engine::KeyCode::Enter) {
+            self.confirmed = true;
+        }
+    }
+
+    fn confirmed(&self) -> bool {
+        self.confirmed
+    }
+
+    fn set_confirmed(&mut self, value: bool) {
+        self.confirmed = value;
     }
 }
 

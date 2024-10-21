@@ -3,19 +3,29 @@ use crate::algorithms::sorting::*;
 use crate::menu::menu::Menu;
 use console_engine::KeyCode;
 
+use super::menu_trait::MenuTrait;
+
 pub fn run_sort_menu(engine: &mut console_engine::ConsoleEngine) {
     let sort_items = vec![
-        "Bubble Sort",
-        "Quick Sort",
-        "Quick3 Sort",
-        "Merge Sort",
-        "Heap Sort",
-        "Shell Sort",
-        "Insertion Sort",
-        "Selection Sort",
+        "Bubble Sort".to_string(),
+        "Quick Sort".to_string(),
+        "Quick3 Sort".to_string(),
+        "Merge Sort".to_string(),
+        "Heap Sort".to_string(),
+        "Shell Sort".to_string(),
+        "Insertion Sort".to_string(),
+        "Selection Sort".to_string(),
     ];
 
-    let mut sort_menu = Menu::new(10, 10, 20, 5, sort_items);
+    let mut sort_menu = Menu {
+        x: 10,
+        y: 10,
+        w: 20,
+        h: 5,
+        items: sort_items,
+        selected: 0,
+        _quit: false,
+    };
     loop {
         engine.clear_screen();
         engine.wait_frame();

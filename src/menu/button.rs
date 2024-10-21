@@ -13,6 +13,8 @@ pub struct Button {
     pub h: i32,
     pub text: String,
     pub selected: bool,
+    // callback: fn(),
+    pub callback: Option<fn()>,
 }
 
 impl Button {
@@ -24,6 +26,7 @@ impl Button {
             h,
             text: text.to_string(),
             selected: false,
+            callback: None,
         }
     }
 

@@ -1,8 +1,14 @@
 use crate::algorithms::maze_generation::*;
 
+use crate::menu::button::Button;
 use crate::menu::dropdown::DropDown;
 use console_engine::ConsoleEngine;
 use console_engine::KeyCode;
+
+use crate::menu::menu_handler::MenuHandler;
+use crate::menu::theme::default_theme;
+
+use super::menu_trait::MenuTrait;
 
 pub fn run_maze_menu(engine: &mut ConsoleEngine) {
     let maze_items = vec![
@@ -13,22 +19,37 @@ pub fn run_maze_menu(engine: &mut ConsoleEngine) {
         "Hunt and Kill".to_string(),
         "Aldous-Broder".to_string(),
         "Wilson's Algorithm".to_string(),
-        "Confirm".to_string(),
     ];
 
-    let mut maze_menu = DropDown::new(10, 10, 20, maze_items);
+    let mut maze_menu = Box::new(DropDown {
+        x: 5,
+        y: 5,
+        width: 20,
+        height: 1,
+        items: maze_items,
+        selected: 0,
+        opened: false,
+        confirmed: false,
+        color: default_theme().color,
+        color_selected: default_theme().color_selected,
+        bg_color: default_theme().bg_color,
+        button: Button::new(5, 5, 20, 1, "Select Algorithm"),
+    });
+
+    let mut menu_handler = MenuHandler::new(maze_menu);
+
     loop {
         engine.wait_frame();
         engine.clear_screen();
-        maze_menu.draw(engine);
-        maze_menu.update(engine);
+        menu_handler.draw(engine);
+        menu_handler.handle_input(engine);
 
-        if engine.is_key_pressed(KeyCode::Char('q')) {
+        if menu_handler.should_quit {
             break;
         }
 
-        if maze_menu.confirmed {
-            match maze_menu.selected {
+        if menu_handler.confirmed() {
+            match menu_handler.get_selected() {
                 0 => recursive_backtracker(),
                 1 => prim_algorithm(),
                 2 => kruskal_algorithm(engine),
@@ -38,7 +59,7 @@ pub fn run_maze_menu(engine: &mut ConsoleEngine) {
                 6 => wilson_algorithm(),
                 _ => (),
             }
-            maze_menu.confirmed = false;
+            menu_handler.set_confirmed(false);
         }
 
         engine.draw();
