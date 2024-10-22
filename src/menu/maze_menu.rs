@@ -59,12 +59,18 @@ pub fn run_maze_menu(engine: &mut ConsoleEngine) {
         if menu_handler.confirmed() {
             menu_handler.set_confirmed(false);
             let screen_size = termsize::get().unwrap();
-            let width = screen_size.cols / 4 - 1;
+            let display_width = screen_size.cols * 3 / 4;
+            let display_height = screen_size.rows - 2; // Leave some space for the menu
 
-            let height = screen_size.rows / 2 - 1;
-            // resize screen to fit maze
-            let maze = Maze::new(width as usize, height as usize);
-            let scene = MazeScene::new(maze.clone(), 0, 0, 2);
+            // Calculate the maze width and height
+            let maze_width = (display_width - 1) / 4;
+            let maze_height = (display_height - 1) / 2;
+
+            // Create the maze
+            let maze = Maze::new(maze_width as usize, maze_height as usize);
+            let x = (screen_size.cols as i32 - display_width as i32);
+            let y = 1; // Start just below the menu
+            let scene = MazeScene::new(maze.clone(), x, y, 2);
 
             let running = Arc::new(AtomicBool::new(true));
             let algorithm: Box<dyn Algorithm> = match menu_handler.get_selected() {
@@ -78,14 +84,18 @@ pub fn run_maze_menu(engine: &mut ConsoleEngine) {
 
             while running.load(std::sync::atomic::Ordering::SeqCst) {
                 engine.wait_frame();
+                engine.clear_screen();
 
                 menu_handler.draw(engine);
                 menu_handler.handle_input(engine);
-                if menu_handler.should_quit {
+                if menu_handler.should_quit || menu_handler.confirmed() {
+                    runner.stop();
                     break;
                 }
 
                 runner.render(engine);
+
+                engine.draw();
             }
         }
 

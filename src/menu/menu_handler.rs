@@ -24,6 +24,7 @@ impl MenuHandler {
     }
 
     pub fn handle_input(&mut self, engine: &mut console_engine::ConsoleEngine) {
+        self.should_quit = false;
         if engine.is_key_pressed(KeyCode::Down) {
             self.menu.next();
         }

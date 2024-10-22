@@ -122,17 +122,28 @@ impl MazeScene {
     fn choose_color(&self, ch: char, value: i32, random_colored: bool) -> Color {
         if random_colored && ch != WALL_CHAR {
             // Return a random color based on the value of the character (use hash)
-            let mut hash = value;
-            hash = hash.wrapping_mul(26544357);
-            let r = (hash & 0xFF) as u8;
-            let g = ((hash >> 8) & 0xFF) as u8;
-            let b = ((hash >> 16) & 0xFF) as u8;
-            return Color::Rgb { r, g, b };
+
+            return self.get_random_color(value);
         }
         match ch {
             WALL_CHAR => self.color_wall,
             VISITED_CHAR => self.color_visited,
             _ => self.color_path,
         }
+    }
+    // Get random color based on the value of the cell
+    // This function is used to colorize the cells with a random color
+    // Avoid black, gray and white colors
+    pub fn get_random_color(&self, cell: i32) -> Color {
+        let colors = [
+            Color::Red,
+            Color::Green,
+            Color::Blue,
+            Color::Yellow,
+            Color::Cyan,
+            Color::Magenta,
+        ];
+        let index = (cell % colors.len() as i32).abs() as usize;
+        colors[index]
     }
 }

@@ -48,12 +48,13 @@ impl Algorithm for RecursiveBacktracker {
         let mut stack: Vec<(usize, usize)> = Vec::new();
         let mut visited: Vec<Vec<bool>> = vec![vec![false; width]; height];
         let mut current = (rng.gen_range(0..width), rng.gen_range(0..height));
+        let mut count = 0;
         visited[current.1][current.0] = true;
         stack.push(current);
         while running.load(Ordering::SeqCst) && !stack.is_empty() {
             let neighbor = choose_random_neighbor(current, width, height, &visited);
-            let current_cell = maze.get_cell_mut(current.0 as i32, current.1 as i32);
-            current_cell.visited = true;
+            maze.get_cell_mut(current.0 as i32, current.1 as i32)
+                .visited = true;
             match neighbor {
                 Some(next) => {
                     let (nx, ny) = next;
@@ -67,7 +68,6 @@ impl Algorithm for RecursiveBacktracker {
                 }
             }
 
-            // Update scene and visualization after each step
             scene.lock().unwrap().maze = maze.clone();
         }
         thread::sleep(Duration::from_secs(2));
@@ -89,6 +89,7 @@ impl Algorithm for KruskalAlgorithm {
         let mut sets: Vec<Vec<(usize, usize)>> = Vec::new();
         let mut walls: Vec<(usize, usize, usize, usize)> = Vec::new();
         let mut maze = maze.lock().unwrap();
+        let mut count = 0;
         // Initialize each cell as a separate set
         for y in 0..height {
             for x in 0..width {
@@ -133,6 +134,7 @@ impl Algorithm for KruskalAlgorithm {
                 sets.push(new_set);
                 sets.retain(|set| set != &set1 && set != &set2);
             }
+
             // Update scene and visualization after each step
             scene.lock().unwrap().maze = maze.clone();
         }
@@ -183,7 +185,6 @@ impl AlgorithmRunner {
     }
 
     pub fn render(&self, engine: &mut console_engine::ConsoleEngine) {
-        engine.clear_screen();
         let scene = self.scene.lock().unwrap();
         // Different settings by algorithm:
         let algorithm_type = self.algorithm.as_ref();
@@ -196,7 +197,6 @@ impl AlgorithmRunner {
                 (true, false, Vec::new(), false)
             };
         scene.draw(engine, settings.0, settings.1, settings.2, settings.3);
-        engine.draw();
     }
 }
 
