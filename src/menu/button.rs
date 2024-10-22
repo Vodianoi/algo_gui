@@ -4,6 +4,11 @@ use console_engine::ConsoleEngine;
 /// Can also be used as a menu item.
 use console_engine::KeyCode;
 
+use text_to_ascii_art::Alignment;
+use text_to_ascii_art::{align, fonts, to_art};
+
+use termsize;
+
 use console_engine::pixel;
 
 pub struct Button {
@@ -34,6 +39,21 @@ impl Button {
     // If the button is selected, draw it with a different color
     // draw a frame around the button
     pub fn draw(&self, engine: &mut ConsoleEngine) {
+        // If terminal is too small, use print_fbg
+        // If terminal is big enough, use text_to_ascii_art
+        let screen_size = termsize::get().unwrap();
+        let mut art = to_art(self.text.clone(), "", 0, 0, 0).unwrap();
+        art = align(&art, Alignment::Center, 0);
+
+        let max_art_width = art.lines().map(|line| line.len()).max().unwrap();
+        if max_art_width > screen_size.cols as usize / 2 {
+            self.draw_small(engine);
+        } else {
+            self.draw_big(engine);
+        }
+    }
+
+    pub fn draw_small(&self, engine: &mut ConsoleEngine) {
         if self.selected {
             engine.print_fbg(
                 self.x,
@@ -52,6 +72,25 @@ impl Button {
             )
         }
         self.print_frame(engine);
+    }
+
+    // fn to_art (input: String, leading: usize, gap: usize, trailing: usize) -> Result<String, String>
+    pub fn draw_big(&self, engine: &mut ConsoleEngine) {
+        let screen_size = termsize::get().unwrap();
+        let art = to_art(self.text.clone(), fonts::get_font("default")[0], 0, 0, 0).unwrap();
+
+        let max_art_width = art.lines().map(|line| line.len()).max().unwrap();
+
+        let mut y = self.y;
+        for line in art.lines() {
+            let color = if self.selected {
+                Color::Blue
+            } else {
+                Color::White
+            };
+            engine.print_fbg(self.x, y, line, color, Color::Black);
+            y += 1;
+        }
     }
 
     pub fn print_frame(&self, engine: &mut ConsoleEngine) {
