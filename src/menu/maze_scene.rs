@@ -67,26 +67,29 @@ impl MazeScene {
                 // Draw the cell's position
                 let draw_x = x * 2 + 1;
                 let draw_y = y * 2 + 1;
-
-                // Draw walls if needed
-                if !cell.has_wall_north() && draw_y > 0 {
-                    laby_with_walls[draw_y - 1][draw_x] = cell.c;
-                }
-                if !cell.has_wall_south() && draw_y < new_height - 1 {
-                    laby_with_walls[draw_y + 1][draw_x] = cell.c;
-                }
-                if !cell.has_wall_west() && draw_x > 0 {
-                    laby_with_walls[draw_y][draw_x - 1] = cell.c;
-                }
-                if !cell.has_wall_east() && draw_x < new_width - 1 {
-                    laby_with_walls[draw_y][draw_x + 1] = cell.c;
-                }
-
                 // Mark visited cells or path
                 if cell.visited {
                     laby_with_walls[draw_y][draw_x] = VISITED_CHAR;
                 } else {
                     laby_with_walls[draw_y][draw_x] = EMPTY_CHAR;
+                }
+
+                // Draw walls if needed
+                if random_colored {
+                    laby_with_walls[draw_y][draw_x] =
+                        cell.value.to_string().chars().next().unwrap();
+                }
+                if !cell.has_wall_north() && draw_y > 0 {
+                    laby_with_walls[draw_y - 1][draw_x] = laby_with_walls[draw_y][draw_x];
+                }
+                if !cell.has_wall_south() && draw_y < new_height - 1 {
+                    laby_with_walls[draw_y + 1][draw_x] = laby_with_walls[draw_y][draw_x];
+                }
+                if !cell.has_wall_west() && draw_x > 0 {
+                    laby_with_walls[draw_y][draw_x - 1] = laby_with_walls[draw_y][draw_x];
+                }
+                if !cell.has_wall_east() && draw_x < new_width - 1 {
+                    laby_with_walls[draw_y][draw_x + 1] = laby_with_walls[draw_y][draw_x];
                 }
             }
         }
@@ -96,35 +99,36 @@ impl MazeScene {
             for x in 0..new_width {
                 let ch = laby_with_walls[y][x];
 
-                let pixel_char;
-                // Draw based on mode (colored or not)
-                if colored {
-                    pixel_char = match ch {
-                        WALL_CHAR => pixel::pxl_bg(' ', self.color_wall),
-                        VISITED_CHAR => pixel::pxl_bg(' ', self.color_visited),
-                        _ => pixel::pxl_bg(' ', self.color_path),
-                    };
+                // Check if the cell is a number
+                let value: i32 = if ch.is_ascii_digit() {
+                    ch.to_digit(10).unwrap() as i32
                 } else {
-                    // Use different colors based on content
-                    pixel_char = match ch {
-                        WALL_CHAR => pixel::pxl_fg(WALL_CHAR, self.color_wall),
-                        VISITED_CHAR => pixel::pxl_fg(VISITED_CHAR, self.color_visited),
-                        _ => pixel::pxl_fg(PATH_CHAR, self.color_path),
-                    };
-                }
+                    0
+                };
+
+                let pixel_char = if colored {
+                    pixel::pxl_bg(' ', self.choose_color(ch, value, random_colored))
+                } else {
+                    pixel::pxl_fg(ch, self.choose_color(ch, value, random_colored))
+                };
+
                 for i in 0..self.cell_size {
-                    //
-                    //        if sizeX % 2 == 0 and x == sizeX - 1:
-                    //            return
-                    //        elif sizeY % 2 == 0 and y == sizeY - 1:
-                    //            return
                     engine.set_pxl(self.x + (x * 2) as i32 + i, self.y + y as i32, pixel_char);
                 }
             }
         });
     }
 
-    fn choose_color(&self, ch: char) -> Color {
+    fn choose_color(&self, ch: char, value: i32, random_colored: bool) -> Color {
+        if random_colored && ch != WALL_CHAR {
+            // Return a random color based on the value of the character (use hash)
+            let mut hash = value;
+            hash = hash.wrapping_mul(26544357);
+            let r = (hash & 0xFF) as u8;
+            let g = ((hash >> 8) & 0xFF) as u8;
+            let b = ((hash >> 16) & 0xFF) as u8;
+            return Color::Rgb { r, g, b };
+        }
         match ch {
             WALL_CHAR => self.color_wall,
             VISITED_CHAR => self.color_visited,

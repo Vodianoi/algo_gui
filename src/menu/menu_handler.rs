@@ -19,6 +19,8 @@ impl MenuHandler {
 
     pub fn draw(&mut self, engine: &mut console_engine::ConsoleEngine) {
         self.menu.draw(engine);
+
+        engine.check_resize();
     }
 
     pub fn handle_input(&mut self, engine: &mut console_engine::ConsoleEngine) {
@@ -31,7 +33,6 @@ impl MenuHandler {
         if engine.is_key_pressed(KeyCode::Char('q')) {
             self.should_quit = true;
         }
-        // Ctrol + C
         if engine.is_key_pressed_with_modifier(
             KeyCode::Char('c'),
             KeyModifiers::CONTROL,

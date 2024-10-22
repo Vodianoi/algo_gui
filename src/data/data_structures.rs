@@ -93,6 +93,7 @@ impl Maze {
     pub fn remove_wall(&mut self, x: i32, y: i32, nx: i32, ny: i32) {
         let dx = nx - x;
         let dy = ny - y;
+        // North, South, West, East
         if dx == 1 {
             self.get_cell_mut(x, y).walls[3] = false;
             self.get_cell_mut(nx, ny).walls[2] = false;
@@ -106,9 +107,30 @@ impl Maze {
             self.get_cell_mut(x, y).walls[0] = false;
             self.get_cell_mut(nx, ny).walls[1] = false;
         }
-        let cell = self.get_cell_mut(x, y);
-        cell.c = EMPTY_CHAR;
-        cell.value = x + y;
+    }
+
+    pub fn set_start(&mut self, x: i32, y: i32) {
+        self.start = (x, y);
+        self.cells[y as usize][x as usize].c = START_CHAR;
+    }
+
+    pub fn set_goal(&mut self, x: i32, y: i32) {
+        self.goal = (x, y);
+        self.cells[y as usize][x as usize].c = GOAL_CHAR;
+    }
+
+    pub fn clear_path(&mut self) {
+        for y in 0..self.height {
+            for x in 0..self.width {
+                let cell = &mut self.cells[y][x];
+                if cell.c == PATH_CHAR {
+                    cell.c = EMPTY_CHAR;
+                } else if cell.visited {
+                    cell.visited = false;
+                    cell.c = EMPTY_CHAR;
+                }
+            }
+        }
     }
 
     pub fn set_cell(&mut self, x: i32, y: i32, value: i32) {
