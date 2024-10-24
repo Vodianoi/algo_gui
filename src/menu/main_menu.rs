@@ -1,7 +1,7 @@
 use super::menu_handler::MenuHandler;
 use crate::menu::{
-    maze_menu::run_maze_menu, menu::Menu, pathfinding_menu::run_pathfinding_menu,
-    sort_menu::run_sort_menu,
+    alignment::Alignment, button::Button, maze_menu::run_maze_menu, menu::Menu,
+    pathfinding_menu::run_pathfinding_menu, sort_menu::run_sort_menu, text::Text,
 };
 use console_engine::{ConsoleEngine, KeyCode, KeyModifiers};
 use termsize;
@@ -15,28 +15,43 @@ pub fn main_menu() {
     // Initialize the console engine with the full terminal size and 60 FPS
     let mut engine = ConsoleEngine::init(screen_width, screen_height, 60).unwrap();
 
-    // Define the main menu options
-    let menu_items = vec![
-        "Maze Generation".to_string(),
-        "Sorting".to_string(),
-        "Quit".to_string(),
+    // Define the main menu options using the new Button structure
+    let menu_items: Vec<Box<dyn crate::menu::menu_item::MenuItem>> = vec![
+        Box::new(Text {
+            x: 0,
+            y: 0,
+            content: "Algorithm Visualizer".to_string(),
+        }),
+        Box::new(Button {
+            x: 0,
+            y: 0,
+            width: 20,
+            height: 3,
+            label: "Maze Generation".to_string(),
+            selected: false,
+        }),
+        Box::new(Button {
+            x: 0,
+            y: 0,
+            width: 20,
+            height: 3,
+            label: "Sorting".to_string(),
+            selected: false,
+        }),
+        Box::new(Button {
+            x: 0,
+            y: 0,
+            width: 20,
+            height: 3,
+            label: "Quit".to_string(),
+            selected: false,
+        }),
     ];
 
-    // Create a new Menu instance
-    let mut menu = Menu {
-        x: 5,
-        y: 5,
-        w: 20,
-        h: 1,
-        items: menu_items,
-        selected: 0,
-        _quit: false,
-    };
-    // Here we create a handler that implements `MenuTrait`.
-    //     pub fn new(menu: Box<dyn MenuTrait>) -> Self {
-    //    MenuHandler { menu }
-    //}
-    let mut menu_handler = MenuHandler::new(Box::new(menu));
+    // Create a new Menu instance with centered alignment
+    let mut menu = Menu::new(0, 0, 20, 10, menu_items, Alignment::Center);
+
+    // Initialize the menu handler
 
     // Main loop for handling the menu
     loop {
@@ -44,23 +59,24 @@ pub fn main_menu() {
         engine.clear_screen(); // Clear the screen
 
         // Handle the input with the menu handler (implemented via `MenuTrait`)
-        menu_handler.handle_input(&mut engine);
+        menu.handle_input(&mut engine);
+        menu.handle_key_event(&mut engine);
 
         // Handle the menu selection
-        if menu_handler.should_quit {
+        if menu._quit {
             break;
         }
         if engine.is_key_pressed(KeyCode::Enter) {
-            match menu_handler.get_selected() {
-                0 => run_maze_menu(&mut engine),
-                1 => run_sort_menu(&mut engine),
-                2 => break,
+            match menu.selected_index {
+                1 => run_maze_menu(&mut engine), // Maze Generation
+                2 => run_sort_menu(&mut engine), // Sorting
+                3 => break,                      // Quit
                 _ => (),
             }
         }
 
         // Draw the menu to the screen
-        menu_handler.draw(&mut engine);
+        menu.draw(&mut engine);
 
         // Render the current frame
         engine.draw();

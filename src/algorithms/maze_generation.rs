@@ -50,6 +50,9 @@ impl Algorithm for RecursiveBacktracker {
         let mut current = (rng.gen_range(0..width), rng.gen_range(0..height));
         let mut count = 0;
         visited[current.1][current.0] = true;
+        maze.get_cell_mut(current.0 as i32, current.1 as i32)
+            .visited = true;
+
         stack.push(current);
         while running.load(Ordering::SeqCst) && !stack.is_empty() {
             let neighbor = choose_random_neighbor(current, width, height, &visited);
@@ -62,14 +65,16 @@ impl Algorithm for RecursiveBacktracker {
                     current = next;
                     visited[current.1][current.0] = true;
                     stack.push(current);
+                    scene.lock().unwrap().maze = maze.clone();
+                    thread::sleep(Duration::from_millis(10));
                 }
                 None => {
                     current = stack.pop().unwrap();
                 }
             }
-
-            scene.lock().unwrap().maze = maze.clone();
         }
+        maze.get_cell_mut(current.0 as i32, current.1 as i32)
+            .visited = true;
         thread::sleep(Duration::from_secs(2));
         maze.clear_path();
         scene.lock().unwrap().maze = maze.clone();
@@ -133,11 +138,79 @@ impl Algorithm for KruskalAlgorithm {
 
                 sets.push(new_set);
                 sets.retain(|set| set != &set1 && set != &set2);
+                thread::sleep(Duration::from_millis(10));
             }
 
             // Update scene and visualization after each step
             scene.lock().unwrap().maze = maze.clone();
         }
+    }
+}
+
+#[derive(Clone)]
+pub struct PrimsAlgorithm;
+
+// maze is a grid of cells, each cell has a set of walls (n,s,e,w) that can be removed by setting the value to false
+// This algorithm is a randomized version of Prim's algorithm.
+//
+//    Start with a grid full of walls.
+//    Pick a cell, mark it as part of the maze. Add the walls of the cell to the wall list.
+//    While there are walls in the list:
+//        Pick a random wall from the list. If only one of the cells that the wall divides is visited, then:
+//            Make the wall a passage and mark the unvisited cell as part of the maze.
+//            Add the neighboring walls of the cell to the wall list.
+//        Remove the wall from the list.
+//
+//Note that simply running classical Prim's on a graph with random edge weights would create mazes stylistically identical to Kruskal's, because they are both minimal spanning tree algorithms. Instead, this algorithm introduces stylistic variation because the edges closer to the starting point have a lower effective weight.
+impl Algorithm for PrimsAlgorithm {
+    fn run(&self, maze: Arc<Mutex<Maze>>, scene: Arc<Mutex<MazeScene>>, running: Arc<AtomicBool>) {
+        let mut rng = rand::thread_rng();
+        let width = maze.lock().unwrap().width;
+        let height = maze.lock().unwrap().height;
+        let mut maze = maze.lock().unwrap();
+        let mut walls: Vec<(usize, usize, usize, usize)> = Vec::new();
+        let mut visited: Vec<Vec<bool>> = vec![vec![false; width]; height];
+        let mut current = (0, 0);
+        visited[current.1][current.0] = true;
+        maze.get_cell_mut(current.0 as i32, current.1 as i32)
+            .visited = true;
+        for y in 0..height {
+            for x in 0..width {
+                if x > 0 {
+                    walls.push((x, y, x - 1, y));
+                }
+                if y > 0 {
+                    walls.push((x, y, x, y - 1));
+                }
+            }
+        }
+        while running.load(Ordering::SeqCst) && !walls.is_empty() {
+            let (x, y, nx, ny) = walls.remove(rng.gen_range(0..walls.len()));
+            if visited[y][x] != visited[ny][nx] {
+                maze.remove_wall(x as i32, y as i32, nx as i32, ny as i32);
+                visited[y][x] = true;
+                visited[ny][nx] = true;
+                maze.get_cell_mut(x as i32, y as i32).visited = true;
+                maze.get_cell_mut(nx as i32, ny as i32).visited = true;
+                if x > 0 && !visited[y][x - 1] {
+                    walls.push((x, y, x - 1, y));
+                }
+                if x < width - 1 && !visited[y][x + 1] {
+                    walls.push((x + 1, y, x, y));
+                }
+                if y > 0 && !visited[y - 1][x] {
+                    walls.push((x, y, x, y - 1));
+                }
+                if y < height - 1 && !visited[y + 1][x] {
+                    walls.push((x, y + 1, x, y));
+                }
+                scene.lock().unwrap().maze = maze.clone();
+                thread::sleep(Duration::from_millis(10));
+            }
+        }
+        thread::sleep(Duration::from_secs(2));
+        maze.clear_path();
+        scene.lock().unwrap().maze = maze.clone();
     }
 }
 

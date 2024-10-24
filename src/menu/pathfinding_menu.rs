@@ -1,54 +1,78 @@
 use crate::algorithms::pathfinding::*;
 use crate::menu::theme::default_theme;
-
-use crate::menu::button::Button;
-use crate::menu::dropdown::DropDown;
+use crate::menu::{
+    alignment::Alignment, button::Button, dropdown::Dropdown, menu::Menu, menu_item::MenuItem,
+};
 use console_engine::{ConsoleEngine, KeyCode};
 
 use super::{menu_handler, menu_trait::MenuTrait};
 
 // Run the pathfinding menu.
-//  - This function displays the pathfinding algorithms menu.
-//  It allows the user to select a pathfinding algorithm to visualize.
-//  and the maze generation algorithm
-
+// This function displays the pathfinding algorithms menu.
+// It allows the user to select a pathfinding algorithm to visualize.
 pub fn run_pathfinding_menu(engine: &mut ConsoleEngine) {
+    // Define the dropdown items for pathfinding algorithms
     let pathfinding_items = vec!["BFS".to_string(), "DFS".to_string()];
 
-    let mut pathfinding_menu = DropDown {
+    // Create the dropdown as a MenuItem (it will be part of the main Menu)
+    let pathfinding_dropdown = Box::new(Dropdown {
         x: 0,
         y: 0,
         width: 20,
-        height: 1,
-        items: pathfinding_items,
-        selected: 0,
-        opened: false,
-        confirmed: false,
-        color: default_theme().color,
-        color_selected: default_theme().color_selected,
-        bg_color: default_theme().bg_color,
-        button: Button::new(5, 5, 20, 1, "Pathfinding"),
-    };
+        options: pathfinding_items,
+        selected_index: 0,
+        is_open: false,
+        selected: false,
+    });
+    // Create the "Back" button to allow returning to the previous menu
+    let back_button = Box::new(Button {
+        x: 0,
+        y: 0,
+        width: 20,
+        height: 3,
+        label: "Back".to_string(),
+        selected: false,
+    });
+    // Create the main menu with the dropdown and back button
+    let menu_items: Vec<Box<dyn MenuItem>> = vec![pathfinding_dropdown, back_button];
 
-    let mut menu_handler = menu_handler::MenuHandler::new(Box::new(pathfinding_menu));
+    let mut pathfinding_menu = Menu::new(0, 0, 20, 10, menu_items, Alignment::Center);
+    // Create the menu handler
+    let mut menu = Box::new(pathfinding_menu);
+
     loop {
         engine.wait_frame();
         engine.clear_screen();
-        menu_handler.draw(engine);
-        menu_handler.handle_input(engine);
 
-        if menu_handler.should_quit {
+        // Draw and handle input for the menu
+        menu.draw(engine);
+        menu.handle_input(engine);
+
+        // Exit the loop if the user requests to quit
+        if menu._quit {
             break;
         }
 
-        if menu_handler.confirmed() {
-            match menu_handler.get_selected() {
-                0 => bfs(),
-                1 => dfs(),
-                _ => bfs(),
-            };
+        // Handle confirmation when the user presses "Enter"
+        if menu.confirmed() {
+            match menu.get_selected() {
+                0 => {
+                    // Pathfinding dropdown confirmed
+                    let values = menu.get_values();
 
-            menu_handler.set_confirmed(false);
+                    let selected_algorithm = values.get(0).unwrap();
+                    match selected_algorithm.as_str() {
+                        "BFS" => bfs(),
+                        "DFS" => dfs(),
+                        _ => bfs(),
+                    }
+                }
+                1 => break, // Back button selected
+                _ => {}
+            }
+
+            // Reset the confirmation state after handling it
+            menu.set_confirmed(false);
         }
 
         engine.draw();
