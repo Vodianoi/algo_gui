@@ -1,13 +1,15 @@
-use crate::data::data_structures::{Cell, Maze};
+use crate::data::data_structures::{Cell, Graph, Maze};
 use crate::menu::maze_scene::MazeScene;
+
 use rand::seq::SliceRandom;
 use rand::Rng;
 use std::any::Any;
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
-use termsize;
+
 // Add a helper trait for cloning trait objects
 pub trait DynClone {
     fn clone_box(&self) -> Box<dyn Algorithm>;
@@ -161,55 +163,142 @@ pub struct PrimsAlgorithm;
 //            Add the neighboring walls of the cell to the wall list.
 //        Remove the wall from the list.
 //
-//Note that simply running classical Prim's on a graph with random edge weights would create mazes stylistically identical to Kruskal's, because they are both minimal spanning tree algorithms. Instead, this algorithm introduces stylistic variation because the edges closer to the starting point have a lower effective weight.
+// Uses Graph data structure to represent the maze
 impl Algorithm for PrimsAlgorithm {
+    fn run(&self, maze: Arc<Mutex<Maze>>, scene: Arc<Mutex<MazeScene>>, running: Arc<AtomicBool>) {
+        let mut rng = rand::thread_rng();
+        let mut maze = maze.lock().unwrap();
+
+        // Initialize the walls list with the start cell's neighbors
+        let mut walls: Vec<((i32, i32), (i32, i32))> = Vec::new();
+        let start = maze.start;
+        maze.get_cell_mut(start.0, start.1).visited = true;
+
+        for neighbor in maze.get_neighbors(start.0, start.1) {
+            walls.push((start, neighbor));
+        }
+
+        // Run the algorithm while there are walls to process and the running flag is true
+        while running.load(Ordering::SeqCst) && !walls.is_empty() {
+            // Select a random wall from the list
+            let random_wall_index = rng.gen_range(0..walls.len());
+            let (cell, next) = walls.swap_remove(random_wall_index);
+
+            let (cx, cy) = cell;
+            let (nx, ny) = next;
+
+            // If next cell is not visited, remove the wall between cell and next
+            if !maze.get_cell(nx, ny).is_visited() {
+                maze.remove_wall(cx, cy, nx, ny);
+
+                // Mark the cell as visited and add its neighbors to the wall list
+                maze.get_cell_mut(nx, ny).visit(0);
+
+                for neighbor in maze.get_neighbors(nx, ny) {
+                    if !maze.get_cell(neighbor.0, neighbor.1).is_visited() {
+                        walls.push(((nx, ny), neighbor));
+                    }
+                }
+
+                // Update the scene for visualization
+                scene.lock().unwrap().maze = maze.clone();
+                thread::sleep(Duration::from_millis(10));
+            }
+        }
+
+        // Final update of the maze for visualization
+        thread::sleep(Duration::from_secs(2));
+        maze.clear_path();
+        scene.lock().unwrap().maze = maze.clone();
+    }
+}
+
+#[derive(Clone)]
+pub struct EllerAlgorithm;
+
+impl Algorithm for EllerAlgorithm {
     fn run(&self, maze: Arc<Mutex<Maze>>, scene: Arc<Mutex<MazeScene>>, running: Arc<AtomicBool>) {
         let mut rng = rand::thread_rng();
         let width = maze.lock().unwrap().width;
         let height = maze.lock().unwrap().height;
         let mut maze = maze.lock().unwrap();
-        let mut walls: Vec<(usize, usize, usize, usize)> = Vec::new();
-        let mut visited: Vec<Vec<bool>> = vec![vec![false; width]; height];
-        let mut current = (0, 0);
-        visited[current.1][current.0] = true;
-        maze.get_cell_mut(current.0 as i32, current.1 as i32)
-            .visited = true;
+
+        // Each cell has a unique set to start
+        let mut sets = HashMap::new();
+        let mut next_set = 1;
+
         for y in 0..height {
+            // Step 1: Initialize each cell in the row with a unique set (if it doesn't have one)
             for x in 0..width {
-                if x > 0 {
-                    walls.push((x, y, x - 1, y));
+                maze.set_cell(x as i32, y as i32, next_set);
+                sets.insert((x, y), next_set);
+                next_set += 1;
+            }
+
+            // Step 2: Randomly merge adjacent cells in the row
+            for x in 0..(width - 1) {
+                if rng.gen_bool(0.5) {
+                    // Randomly decide to join sets
+                    let current_set = sets[&(x, y)];
+                    let right_set = sets[&(x + 1, y)];
+
+                    if current_set != right_set {
+                        maze.remove_wall(x as i32, y as i32, (x + 1) as i32, y as i32);
+
+                        // Update set references
+                        for ((sx, sy), set) in sets.iter_mut() {
+                            if *set == right_set {
+                                *set = current_set;
+                            }
+                        }
+                    }
                 }
-                if y > 0 {
-                    walls.push((x, y, x, y - 1));
+            }
+
+            // Step 3: Randomly extend cells in each set vertically downwards
+            if y < height - 1 {
+                let mut cells_in_set = HashMap::new();
+                for x in 0..width {
+                    let set = sets[&(x, y)];
+                    cells_in_set.entry(set).or_insert(Vec::new()).push(x);
+                }
+
+                for (set, cells) in cells_in_set.iter() {
+                    let mut extended = false;
+                    for &x in cells {
+                        if rng.gen_bool(0.5) || !extended {
+                            maze.remove_wall(x as i32, y as i32, x as i32, (y + 1) as i32);
+                            sets.insert((x, y + 1), *set);
+                            extended = true;
+                        } else {
+                            sets.insert((x, y + 1), next_set);
+                            next_set += 1;
+                        }
+                    }
+                    scene.lock().unwrap().maze = maze.clone();
+                    thread::sleep(Duration::from_millis(10));
+                }
+            }
+
+            // Visualize step-by-step for debugging
+            scene.lock().unwrap().maze = maze.clone();
+            thread::sleep(Duration::from_millis(10));
+        }
+
+        // Step 4: Final row - join all cells to complete the maze
+        let final_y = height - 1;
+        for x in 0..(width - 1) {
+            let left_set = sets[&(x, final_y)];
+            let right_set = sets[&(x + 1, final_y)];
+            if left_set != right_set {
+                maze.remove_wall(x as i32, final_y as i32, (x + 1) as i32, final_y as i32);
+                for ((sx, sy), set) in sets.iter_mut() {
+                    if *set == right_set {
+                        *set = left_set;
+                    }
                 }
             }
         }
-        while running.load(Ordering::SeqCst) && !walls.is_empty() {
-            let (x, y, nx, ny) = walls.remove(rng.gen_range(0..walls.len()));
-            if visited[y][x] != visited[ny][nx] {
-                maze.remove_wall(x as i32, y as i32, nx as i32, ny as i32);
-                visited[y][x] = true;
-                visited[ny][nx] = true;
-                maze.get_cell_mut(x as i32, y as i32).visited = true;
-                maze.get_cell_mut(nx as i32, ny as i32).visited = true;
-                if x > 0 && !visited[y][x - 1] {
-                    walls.push((x, y, x - 1, y));
-                }
-                if x < width - 1 && !visited[y][x + 1] {
-                    walls.push((x + 1, y, x, y));
-                }
-                if y > 0 && !visited[y - 1][x] {
-                    walls.push((x, y, x, y - 1));
-                }
-                if y < height - 1 && !visited[y + 1][x] {
-                    walls.push((x, y + 1, x, y));
-                }
-                scene.lock().unwrap().maze = maze.clone();
-                thread::sleep(Duration::from_millis(10));
-            }
-        }
-        thread::sleep(Duration::from_secs(2));
-        maze.clear_path();
         scene.lock().unwrap().maze = maze.clone();
     }
 }

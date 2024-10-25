@@ -263,3 +263,46 @@ impl Cell {
         self.walls[3]
     }
 }
+
+pub struct Graph {
+    vertices: Vec<i32>,
+    edges: Vec<(i32, i32)>,
+}
+
+impl Graph {
+    pub fn new(maze: &Maze) -> Graph {
+        let mut graph = Graph {
+            vertices: Vec::new(),
+            edges: Vec::new(),
+        };
+        for y in 0..maze.height {
+            for x in 0..maze.width {
+                let cell = maze.get_cell(x as i32, y as i32);
+                graph.add_vertex(cell.value);
+                let neighbors = maze.get_neighbors(x as i32, y as i32);
+                for neighbor in neighbors {
+                    graph.add_edge(cell.value, maze.get_cell(neighbor.0, neighbor.1).value);
+                }
+            }
+        }
+        graph
+    }
+    pub fn add_vertex(&mut self, value: i32) {
+        self.vertices.push(value);
+    }
+    pub fn add_edge(&mut self, from: i32, to: i32) {
+        self.edges.push((from, to));
+    }
+    pub fn get_neighbors(&self, vertex: i32) -> Vec<i32> {
+        let mut neighbors = Vec::new();
+        for (from, to) in &self.edges {
+            if *from == vertex {
+                neighbors.push(*to);
+            }
+        }
+        neighbors
+    }
+    pub fn get_vertices(&self) -> Vec<i32> {
+        self.vertices.clone()
+    }
+}

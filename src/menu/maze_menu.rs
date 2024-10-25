@@ -1,5 +1,5 @@
 use std::sync::atomic::AtomicBool;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use termsize;
 
 use crate::algorithms::maze_generation::*;
@@ -7,12 +7,9 @@ use crate::data::data_structures::Maze;
 use crate::menu::{
     alignment::Alignment, button::Button, dropdown::Dropdown, menu::Menu, menu_item::MenuItem,
 };
-use console_engine::{ConsoleEngine, KeyCode};
+use console_engine::ConsoleEngine;
 
 use super::maze_scene::MazeScene;
-use super::menu_trait::MenuTrait;
-use crate::menu::menu_handler::MenuHandler;
-use crate::menu::theme::default_theme;
 
 pub fn run_maze_menu(engine: &mut ConsoleEngine) {
     // Define the dropdown items for maze generation algorithms
@@ -20,7 +17,7 @@ pub fn run_maze_menu(engine: &mut ConsoleEngine) {
         "Recursive Backtracker".to_string(),
         "Prim's Algorithm".to_string(),
         "Kruskal's Algorithm".to_string(),
-        //"Eller's Algorithm".to_string(),
+        "Eller's Algorithm".to_string(),
         //"Hunt and Kill".to_string(),
         //"Aldous-Broder".to_string(),
         //"Wilson's Algorithm".to_string(),
@@ -95,7 +92,7 @@ pub fn run_maze_menu(engine: &mut ConsoleEngine) {
                 "Recursive Backtracker" => Box::new(RecursiveBacktracker),
                 "Prim's Algorithm" => Box::new(PrimsAlgorithm),
                 "Kruskal's Algorithm" => Box::new(KruskalAlgorithm),
-                // 3 => Box::new(EllersAlgorithm),
+                "Eller's Algorithm" => Box::new(EllerAlgorithm),
                 // 4 => Box::new(HuntAndKill),
                 // 5 => Box::new(AldousBroder),
                 // 6 => Box::new(WilsonsAlgorithm),
