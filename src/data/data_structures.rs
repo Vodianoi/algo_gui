@@ -262,6 +262,10 @@ impl Cell {
     pub fn has_wall_east(&self) -> bool {
         self.walls[3]
     }
+
+    pub fn has_all_walls(&self) -> bool {
+        self.walls.iter().all(|&wall| wall)
+    }
 }
 
 pub struct Graph {

@@ -1,3 +1,6 @@
+use std::sync::atomic::AtomicBool;
+
+use crate::algorithms::maze_generation::{Algorithm, AlgorithmRunner};
 use crate::algorithms::pathfinding::*;
 use crate::menu::theme::default_theme;
 use crate::menu::{
@@ -55,21 +58,15 @@ pub fn run_pathfinding_menu(engine: &mut ConsoleEngine) {
 
         // Handle confirmation when the user presses "Enter"
         if menu.confirmed() {
-            match menu.get_selected() {
-                0 => {
-                    // Pathfinding dropdown confirmed
-                    let values = menu.get_values();
+            // Pathfinding dropdown confirmed
+            let values = menu.get_values();
 
-                    let selected_algorithm = values.get(0).unwrap();
-                    match selected_algorithm.as_str() {
-                        "BFS" => bfs(),
-                        "DFS" => dfs(),
-                        _ => bfs(),
-                    }
-                }
-                1 => break, // Back button selected
-                _ => {}
-            }
+            let selected_algorithm = values.get(0).unwrap();
+            let algorithm: Box<dyn Algorithm> = match selected_algorithm.as_str() {
+                "BFS" => Box::new(BFS),
+                "DFS" => Box::new(DFS),
+                _ => Box::new(BFS),
+            };
 
             // Reset the confirmation state after handling it
             menu.set_confirmed(false);

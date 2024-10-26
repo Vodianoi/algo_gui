@@ -357,6 +357,17 @@ impl AlgorithmRunner {
                 (true, false, Vec::new(), false)
             };
         scene.draw(engine, settings.0, settings.1, settings.2, settings.3);
+
+        // If the algorithm is done running, display a message
+        if !self.running.load(Ordering::SeqCst) {
+            engine.print_fbg(
+                engine.get_width() as i32 / 2 - 10,
+                engine.get_height() as i32 / 2 - 1,
+                "Press any key to continue",
+                console_engine::Color::White,
+                console_engine::Color::Black,
+            );
+        }
     }
 }
 
