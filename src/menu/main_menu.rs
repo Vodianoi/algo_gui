@@ -13,43 +13,20 @@ pub fn main_menu() {
     let screen_height = rows as u32;
 
     // Initialize the console engine with the full terminal size and 60 FPS
-    let mut engine = ConsoleEngine::init(screen_width, screen_height, 60).unwrap();
+    let mut engine = ConsoleEngine::init(screen_width, screen_height, 30).unwrap();
 
     // Define the main menu options using the new Button structure
     let menu_items: Vec<Box<dyn crate::menu::menu_item::MenuItem>> = vec![
-        Box::new(Text {
-            x: 0,
-            y: 0,
-            content: "Algorithm Visualizer".to_string(),
-        }),
-        Box::new(Button {
-            x: 0,
-            y: 0,
-            width: 20,
-            height: 3,
-            label: "Maze Generation".to_string(),
-            selected: false,
-        }),
-        Box::new(Button {
-            x: 0,
-            y: 0,
-            width: 20,
-            height: 3,
-            label: "Sorting".to_string(),
-            selected: false,
-        }),
-        Box::new(Button {
-            x: 0,
-            y: 0,
-            width: 20,
-            height: 3,
-            label: "Quit".to_string(),
-            selected: false,
-        }),
+        Box::new(Text::new("Algorithm Visualizer".to_string())),
+        Box::new(Button::new(20, 3, "Maze Generation".to_string())),
+        Box::new(Button::new(20, 3, "Sorting".to_string())),
+        Box::new(Button::new(20, 3, "Quit".to_string())),
     ];
 
     // Create a new Menu instance with centered alignment
-    let mut menu = Menu::new(0, 0, 20, 10, menu_items, Alignment::Center);
+    let menu_width = screen_width as i32 / 4;
+    let menu_height = screen_height as i32 - 2;
+    let mut menu = Menu::new(0, 0, menu_width, menu_height, menu_items, Alignment::Left);
 
     // Initialize the menu handler
 

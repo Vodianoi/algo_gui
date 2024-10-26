@@ -46,6 +46,9 @@ impl Menu {
     pub fn draw(&mut self, engine: &mut ConsoleEngine) {
         engine.check_resize();
 
+        self.width = engine.get_width() as i32 / 4;
+        self.height = engine.get_height() as i32 - 2;
+
         let item_count = self.items.len() as i32;
         let spacing = if item_count > 1 {
             self.height / item_count
@@ -89,6 +92,27 @@ impl Menu {
             // Draw the item
             item.draw(engine);
         }
+
+        self.draw_border(engine);
+    }
+
+    fn draw_border(&self, engine: &mut ConsoleEngine) {
+        for x in self.x..self.x + self.width {
+            engine.print(x, self.y, "─");
+            engine.print(x, self.y + self.height, "─");
+        }
+        for y in self.y..self.y + self.height {
+            engine.print(self.x, y, "│");
+            engine.print(self.x + self.width, y, "│");
+        }
+        engine.print(self.x, self.y, "┌");
+        engine.print(self.x + self.width, self.y, "┐");
+        engine.print(self.x, self.y + self.height, "└");
+        engine.print(self.x + self.width, self.y + self.height, "┘");
+
+        for i in 1..self.height {
+            engine.print(self.x + self.width, self.y + i, "│");
+        }
     }
 
     fn calculate_x_position(&self, content: &str) -> i32 {
@@ -96,18 +120,6 @@ impl Menu {
             Alignment::Left => self.x,
             Alignment::Center => self.x + (self.width - content.len() as i32) / 2,
             Alignment::Right => self.x + self.width - content.len() as i32,
-        }
-    }
-
-    fn next(&mut self) {
-        self.selected_index = (self.selected_index + 1) % self.items.len();
-    }
-
-    fn previous(&mut self) {
-        if self.selected_index == 0 {
-            self.selected_index = self.items.len() - 1;
-        } else {
-            self.selected_index -= 1;
         }
     }
 

@@ -67,8 +67,9 @@ impl Algorithm for RecursiveBacktracker {
                     current = next;
                     visited[current.1][current.0] = true;
                     stack.push(current);
+                    // Update scene and visualization after each step
                     scene.lock().unwrap().maze = maze.clone();
-                    thread::sleep(Duration::from_millis(10));
+                    thread::sleep(Duration::from_millis(0));
                 }
                 None => {
                     current = stack.pop().unwrap();
@@ -140,7 +141,6 @@ impl Algorithm for KruskalAlgorithm {
 
                 sets.push(new_set);
                 sets.retain(|set| set != &set1 && set != &set2);
-                thread::sleep(Duration::from_millis(10));
             }
 
             // Update scene and visualization after each step
@@ -202,7 +202,6 @@ impl Algorithm for PrimsAlgorithm {
 
                 // Update the scene for visualization
                 scene.lock().unwrap().maze = maze.clone();
-                thread::sleep(Duration::from_millis(10));
             }
         }
 
@@ -276,7 +275,6 @@ impl Algorithm for EllerAlgorithm {
                         }
                     }
                     scene.lock().unwrap().maze = maze.clone();
-                    thread::sleep(Duration::from_millis(10));
                 }
             }
 
