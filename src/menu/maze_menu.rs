@@ -116,14 +116,10 @@ pub fn run_maze_menu(engine: &mut ConsoleEngine) {
 
             // Determine if running a maze generation or pathfinding algorithm
             let running = Arc::new(AtomicBool::new(true));
-            let selected_algorithm: Box<dyn Algorithm> = if !maze_algorithm.is_empty() {
-                maze_alg
-            } else {
-                path_alg
-            };
 
             // Start the selected algorithm
-            let runner = AlgorithmRunner::new(selected_algorithm, maze, scene);
+            let algorithms = vec![maze_alg, path_alg];
+            let mut runner = AlgorithmRunner::new(algorithms, scene);
             runner.start();
 
             // Render the maze while the algorithm is running

@@ -8,8 +8,6 @@ use crate::menu::{
 };
 use console_engine::{ConsoleEngine, KeyCode};
 
-use super::{menu_handler, menu_trait::MenuTrait};
-
 // Run the pathfinding menu.
 // This function displays the pathfinding algorithms menu.
 // It allows the user to select a pathfinding algorithm to visualize.

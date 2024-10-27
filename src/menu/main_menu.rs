@@ -1,4 +1,3 @@
-use super::menu_handler::MenuHandler;
 use crate::menu::{
     alignment::Alignment, button::Button, maze_menu::run_maze_menu, menu::Menu,
     pathfinding_menu::run_pathfinding_menu, sort_menu::run_sort_menu, text::Text,

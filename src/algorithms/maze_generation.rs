@@ -5,10 +5,12 @@ use rand::seq::SliceRandom;
 use rand::Rng;
 use std::any::Any;
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
+
+use super::pathfinding::{BFS, DFS};
 
 // Add a helper trait for cloning trait objects
 pub trait DynClone {
@@ -27,7 +29,9 @@ where
 
 // Make the `Algorithm` trait extend `DynClone`
 pub trait Algorithm: DynClone + Any + Send + Sync {
-    fn run(&self, maze: Arc<Mutex<Maze>>, scene: Arc<Mutex<MazeScene>>, running: Arc<AtomicBool>);
+    fn run(&self, scene: Arc<Mutex<MazeScene>>, running: Arc<AtomicBool>);
+    fn as_any(&self) -> &dyn Any;
+    fn as_any_mut(&mut self) -> &mut dyn Any;
 }
 
 // Implement `Clone` for `Box<dyn Algorithm>`
@@ -42,11 +46,12 @@ impl Clone for Box<dyn Algorithm> {
 pub struct RecursiveBacktracker;
 
 impl Algorithm for RecursiveBacktracker {
-    fn run(&self, maze: Arc<Mutex<Maze>>, scene: Arc<Mutex<MazeScene>>, running: Arc<AtomicBool>) {
+    fn run(&self, scene: Arc<Mutex<MazeScene>>, running: Arc<AtomicBool>) {
         let mut rng = rand::thread_rng();
-        let width = maze.lock().unwrap().width;
-        let height = maze.lock().unwrap().height;
-        let mut maze = maze.lock().unwrap();
+        let mut maze = scene.lock().unwrap().maze.clone();
+
+        let width = maze.width;
+        let height = maze.height;
         let mut stack: Vec<(usize, usize)> = Vec::new();
         let mut visited: Vec<Vec<bool>> = vec![vec![false; width]; height];
         let mut current = (rng.gen_range(0..width), rng.gen_range(0..height));
@@ -69,7 +74,7 @@ impl Algorithm for RecursiveBacktracker {
                     stack.push(current);
                     // Update scene and visualization after each step
                     scene.lock().unwrap().maze = maze.clone();
-                    thread::sleep(Duration::from_millis(0));
+                    thread::sleep(Duration::from_millis(10));
                 }
                 None => {
                     current = stack.pop().unwrap();
@@ -80,7 +85,16 @@ impl Algorithm for RecursiveBacktracker {
             .visited = true;
         thread::sleep(Duration::from_secs(2));
         maze.clear_path();
+        maze.clear_values();
         scene.lock().unwrap().maze = maze.clone();
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
     }
 }
 
@@ -90,13 +104,13 @@ pub struct KruskalAlgorithm;
 
 // maze is a grid of cells, each cell has a set of walls (n,s,e,w) that can be removed by setting the value to false
 impl Algorithm for KruskalAlgorithm {
-    fn run(&self, maze: Arc<Mutex<Maze>>, scene: Arc<Mutex<MazeScene>>, running: Arc<AtomicBool>) {
+    fn run(&self, scene: Arc<Mutex<MazeScene>>, running: Arc<AtomicBool>) {
+        let mut maze = scene.lock().unwrap().maze.clone();
         let mut rng = rand::thread_rng();
-        let width = maze.lock().unwrap().width;
-        let height = maze.lock().unwrap().height;
+        let width = maze.width;
+        let height = maze.height;
         let mut sets: Vec<Vec<(usize, usize)>> = Vec::new();
         let mut walls: Vec<(usize, usize, usize, usize)> = Vec::new();
-        let mut maze = maze.lock().unwrap();
         let mut count = 0;
         // Initialize each cell as a separate set
         for y in 0..height {
@@ -145,7 +159,22 @@ impl Algorithm for KruskalAlgorithm {
 
             // Update scene and visualization after each step
             scene.lock().unwrap().maze = maze.clone();
+            thread::sleep(Duration::from_millis(10));
         }
+
+        // Final update of the maze for visualization
+        thread::sleep(Duration::from_secs(2));
+        maze.clear_path();
+        maze.clear_values();
+        scene.lock().unwrap().maze = maze.clone();
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
     }
 }
 
@@ -165,9 +194,9 @@ pub struct PrimsAlgorithm;
 //
 // Uses Graph data structure to represent the maze
 impl Algorithm for PrimsAlgorithm {
-    fn run(&self, maze: Arc<Mutex<Maze>>, scene: Arc<Mutex<MazeScene>>, running: Arc<AtomicBool>) {
+    fn run(&self, scene: Arc<Mutex<MazeScene>>, running: Arc<AtomicBool>) {
         let mut rng = rand::thread_rng();
-        let mut maze = maze.lock().unwrap();
+        let mut maze = scene.lock().unwrap().maze.clone();
 
         // Initialize the walls list with the start cell's neighbors
         let mut walls: Vec<((i32, i32), (i32, i32))> = Vec::new();
@@ -208,7 +237,16 @@ impl Algorithm for PrimsAlgorithm {
         // Final update of the maze for visualization
         thread::sleep(Duration::from_secs(2));
         maze.clear_path();
+        maze.clear_values();
         scene.lock().unwrap().maze = maze.clone();
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
     }
 }
 
@@ -216,11 +254,12 @@ impl Algorithm for PrimsAlgorithm {
 pub struct EllerAlgorithm;
 
 impl Algorithm for EllerAlgorithm {
-    fn run(&self, maze: Arc<Mutex<Maze>>, scene: Arc<Mutex<MazeScene>>, running: Arc<AtomicBool>) {
+    fn run(&self, scene: Arc<Mutex<MazeScene>>, running: Arc<AtomicBool>) {
         let mut rng = rand::thread_rng();
-        let width = maze.lock().unwrap().width;
-        let height = maze.lock().unwrap().height;
-        let mut maze = maze.lock().unwrap();
+        let mut maze = scene.lock().unwrap().maze.clone();
+
+        let width = maze.width;
+        let height = maze.height;
 
         // Each cell has a unique set to start
         let mut sets = HashMap::new();
@@ -281,6 +320,10 @@ impl Algorithm for EllerAlgorithm {
             // Visualize step-by-step for debugging
             scene.lock().unwrap().maze = maze.clone();
             thread::sleep(Duration::from_millis(10));
+
+            if !running.load(Ordering::SeqCst) {
+                break;
+            }
         }
 
         // Step 4: Final row - join all cells to complete the maze
@@ -297,7 +340,18 @@ impl Algorithm for EllerAlgorithm {
                 }
             }
         }
+        thread::sleep(Duration::from_secs(2));
+        maze.clear_path();
+        maze.clear_values();
         scene.lock().unwrap().maze = maze.clone();
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
     }
 }
 
@@ -313,30 +367,51 @@ fn find_set(sets: &Vec<Vec<(usize, usize)>>, x: usize, y: usize) -> Vec<(usize, 
 
 // Algorithm runner using multithreading and visualization
 pub struct AlgorithmRunner {
-    algorithm: Box<dyn Algorithm>,
-    maze: Arc<Mutex<Maze>>,
+    algorithms: Vec<Box<dyn Algorithm>>,
+    current_algorithm: Arc<AtomicUsize>,
     scene: Arc<Mutex<MazeScene>>,
     running: Arc<AtomicBool>,
+    cache: HashMap<u32, u8>,
+    last_settings: (bool, bool, bool),
 }
+
 impl AlgorithmRunner {
-    pub fn new(algorithm: Box<dyn Algorithm>, maze: Maze, scene: MazeScene) -> Self {
+    pub fn new(algorithms: Vec<Box<dyn Algorithm>>, scene: MazeScene) -> Self {
         AlgorithmRunner {
-            algorithm,
-            maze: Arc::new(Mutex::new(maze)),
+            algorithms,
+            current_algorithm: Arc::new(AtomicUsize::new(0)),
+            last_settings: (true, false, false),
+
             scene: Arc::new(Mutex::new(scene)),
             running: Arc::new(AtomicBool::new(true)),
+            cache: HashMap::new(),
         }
     }
 
     pub fn start(&self) {
-        let maze_clone = Arc::clone(&self.maze);
         let scene_clone = Arc::clone(&self.scene);
         let running_clone = Arc::clone(&self.running);
-        let algorithm_clone = self.algorithm.clone();
+        let algorithms = self.algorithms.clone();
+        let current_algorithm_clone = Arc::clone(&self.current_algorithm);
 
-        // Spawn a thread to run the algorithm
         thread::spawn(move || {
-            algorithm_clone.run(maze_clone, scene_clone, running_clone);
+            current_algorithm_clone.store(0, Ordering::Relaxed);
+            let algorithm_length = algorithms.len();
+
+            for algorithm in algorithms {
+                // Run each algorithm only if `running` is still true
+                if running_clone.load(Ordering::SeqCst) {
+                    algorithm.run(scene_clone.clone(), running_clone.clone());
+                } else {
+                    break;
+                }
+                // Add 1 modulo the number of algorithms to the current index
+                current_algorithm_clone.fetch_add(1, Ordering::Relaxed);
+                current_algorithm_clone.store(
+                    current_algorithm_clone.load(Ordering::Relaxed) % algorithm_length,
+                    Ordering::Relaxed,
+                );
+            }
         });
     }
 
@@ -344,33 +419,38 @@ impl AlgorithmRunner {
         self.running.store(false, Ordering::SeqCst);
     }
 
-    pub fn render(&self, engine: &mut console_engine::ConsoleEngine) {
+    pub fn render(&mut self, engine: &mut console_engine::ConsoleEngine) {
         let scene = self.scene.lock().unwrap();
-        // Different settings by algorithm:
-        let algorithm_type = self.algorithm.as_ref();
-        let settings: (bool, bool, Vec<Cell>, bool) =
-            if algorithm_type.type_id() == RecursiveBacktracker.type_id() {
-                (true, false, Vec::new(), false)
-            } else if algorithm_type.type_id() == KruskalAlgorithm.type_id() {
-                (true, true, Vec::new(), false)
-            } else {
-                (true, false, Vec::new(), false)
-            };
-        scene.draw(engine, settings.0, settings.1, settings.2, settings.3);
+        self.last_settings =
+            self.get_settings(&*self.algorithms[self.current_algorithm.load(Ordering::Relaxed)]);
 
-        // If the algorithm is done running, display a message
-        if !self.running.load(Ordering::SeqCst) {
-            engine.print_fbg(
-                engine.get_width() as i32 / 2 - 10,
-                engine.get_height() as i32 / 2 - 1,
-                "Press any key to continue",
-                console_engine::Color::White,
-                console_engine::Color::Black,
-            );
+        scene.draw(
+            engine,
+            self.last_settings.0,
+            self.last_settings.1,
+            self.last_settings.2,
+            &mut self.cache,
+        );
+    }
+
+    fn get_settings(&self, algorithm: &dyn Algorithm) -> (bool, bool, bool) {
+        if algorithm.as_any().is::<RecursiveBacktracker>() {
+            (true, false, false)
+        } else if algorithm.as_any().is::<KruskalAlgorithm>() {
+            (true, true, false)
+        } else if algorithm.as_any().is::<PrimsAlgorithm>() {
+            (true, false, false)
+        } else if algorithm.as_any().is::<BFS>() {
+            (true, false, true)
+        } else if algorithm.as_any().is::<DFS>() {
+            (true, false, false)
+        } else if algorithm.as_any().is::<EllerAlgorithm>() {
+            (true, false, false)
+        } else {
+            self.last_settings
         }
     }
 }
-
 // Utility functions
 
 fn choose_random_neighbor(

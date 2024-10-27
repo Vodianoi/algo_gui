@@ -17,14 +17,11 @@ mod menu {
     pub mod button;
     pub mod dropdown;
     pub mod dropdown_menu;
-    pub mod form;
     pub mod main_menu;
     pub mod maze_menu;
     pub mod maze_scene;
     pub mod menu;
-    pub mod menu_handler;
     pub mod menu_item;
-    pub mod menu_trait;
     pub mod pathfinding_menu;
     pub mod sort_menu;
     pub mod text;

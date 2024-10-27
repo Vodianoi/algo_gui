@@ -6,7 +6,6 @@ use crate::menu::alignment::Alignment;
 use crate::menu::button::Button;
 use crate::menu::dropdown::Dropdown;
 use crate::menu::menu_item::MenuItem;
-use crate::menu::menu_trait::MenuTrait;
 use crate::menu::text::Text;
 use console_engine::ConsoleEngine;
 

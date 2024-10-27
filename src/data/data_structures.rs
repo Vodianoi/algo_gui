@@ -23,14 +23,16 @@ pub struct Maze {
 impl Maze {
     pub fn new(width: usize, height: usize) -> Maze {
         let mut cells = Vec::new();
-        for y in 0..height {
+        let mut count = 0;
+        (0..height).for_each(|_y| {
             let mut row = Vec::new();
-            for x in 0..width {
-                let value: i32 = x as i32 + y as i32;
+            (0..width).for_each(|_x| {
+                let value: i32 = count;
+                count += 2;
                 row.push(Cell::new(value, WALL_CHAR));
-            }
+            });
             cells.push(row);
-        }
+        });
 
         Maze {
             width,
@@ -133,6 +135,14 @@ impl Maze {
         }
     }
 
+    pub fn clear_values(&mut self) {
+        for y in 0..self.height {
+            for x in 0..self.width {
+                self.cells[y][x].value = -1;
+            }
+        }
+    }
+
     pub fn set_cell(&mut self, x: i32, y: i32, value: i32) {
         self.cells[y as usize][x as usize].value = value;
     }
@@ -165,6 +175,27 @@ impl Maze {
             content.push('\n');
         }
         file.write_all(content.as_bytes()).unwrap();
+    }
+
+    // Get valid neighbors of a cell
+    // A valid neighbor is a cell that is within the maze bounds and has not wall between the two
+    pub fn get_valid_neighbors(&self, x: i32, y: i32) -> Vec<(i32, i32)> {
+        let mut neighbors = Vec::new();
+        let cell = self.get_cell(x, y);
+        let walls = &cell.walls;
+        if !walls[0] && y > 0 {
+            neighbors.push((x, y - 1));
+        }
+        if !walls[1] && y < self.height as i32 - 1 {
+            neighbors.push((x, y + 1));
+        }
+        if !walls[2] && x > 0 {
+            neighbors.push((x - 1, y));
+        }
+        if !walls[3] && x < self.width as i32 - 1 {
+            neighbors.push((x + 1, y));
+        }
+        neighbors
     }
 }
 
@@ -265,6 +296,10 @@ impl Cell {
 
     pub fn has_all_walls(&self) -> bool {
         self.walls.iter().all(|&wall| wall)
+    }
+
+    pub fn has_wall(&self, index: usize) -> bool {
+        self.walls[index]
     }
 }
 
