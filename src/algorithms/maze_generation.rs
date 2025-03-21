@@ -1,5 +1,5 @@
 // use crate::data::data_structures::{Cell, Graph, Maze};
-use crate::menu::maze_scene::MazeScene;
+use crate::scenes::maze_scene::MazeScene;
 
 use console_engine::crossterm;
 use rand::seq::SliceRandom;

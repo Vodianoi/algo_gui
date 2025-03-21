@@ -10,7 +10,7 @@ use crate::menu::{
 };
 use console_engine::{ConsoleEngine, KeyCode};
 
-use super::maze_scene::MazeScene;
+use super::super::scenes::maze_scene::MazeScene;
 
 pub fn run_maze_menu(engine: &mut ConsoleEngine) {
     // Define the dropdown items for maze generation and pathfinding algorithms

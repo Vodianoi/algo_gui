@@ -7,7 +7,7 @@ use std::{
     time::Duration,
 };
 
-use crate::{data::data_structures::Maze, menu::maze_scene::MazeScene};
+use crate::{data::data_structures::Maze, scenes::maze_scene::MazeScene};
 
 use super::maze_generation::Algorithm;
 use std::collections::VecDeque;
