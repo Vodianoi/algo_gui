@@ -1,9 +1,6 @@
 // Maze scene is a simple scene that displays the animation of the maze generation algorithm.
 
 use std::collections::HashMap;
-use std::hash::DefaultHasher;
-use std::hash::Hash;
-use std::hash::Hasher;
 use std::u8;
 
 use crate::data::data_structures::Maze;
@@ -63,7 +60,11 @@ impl MazeScene {
         let mut laby_with_walls_values = vec![vec![-1; new_width]; new_height];
 
         self.populate_maze_with_walls(&mut laby_with_walls, &mut laby_with_walls_values);
-
+        // 2) Unify corridors only when both adjacent cells share the same BFS/region ID
+        //    This ensures no "extra squares" get path color unless they're truly path
+        if bfs {
+            self.unify_corridors_globally(&mut laby_with_walls, &mut laby_with_walls_values);
+        }
         self.render_maze(engine, &laby_with_walls, &laby_with_walls_values, colored, random_colored, bfs, cache);
     }
 
@@ -108,6 +109,63 @@ impl MazeScene {
                 } else {
                     self.mark_walls(cell, draw_x, draw_y, laby_with_walls[draw_y][draw_x],laby_with_walls, laby_with_walls_values);
                 }
+            }
+        }
+    }
+
+        /// This final pass ensures corridor squares only adopt the "path color" if
+    /// both adjacent cell centers share the same BFS value (or final path marker).
+    pub fn unify_corridors_globally(
+        &self,
+        laby_with_walls: &mut Vec<Vec<char>>,
+        laby_with_walls_values: &mut Vec<Vec<i32>>,
+    ) {
+        let height = laby_with_walls.len();
+        let width = laby_with_walls[0].len();
+
+        for y in 0..height {
+            for x in 0..width {
+                // We only care about corridor squares or wall squares – i.e. places between cell centers.
+                // Cell centers are at (odd, odd). So corridors/walls appear at coordinates where
+                // either x or y is even, but not both.
+                // 
+                // For clarity, let's handle horizontal corridors vs vertical corridors separately:
+
+                // 1) Horizontal corridor: (y is odd, x is even)
+                //    The cell centers are at (y, x-1) and (y, x+1)
+                if y % 2 == 1 && x % 2 == 0 {
+                    // Check bounds for neighbor cell centers
+                    if x > 0 && x + 1 < width {
+                        let left_val  = laby_with_walls_values[y][x - 1];
+                        let right_val = laby_with_walls_values[y][x + 1];
+                        if left_val >= 0 && right_val == left_val {
+                            // They share the same BFS/region ID => unify corridor
+                            // If you specifically want to unify only the final BFS path (e.g. -3),
+                            // then check `if left_val == -3 && right_val == -3`.
+                            // Or check `shortest_path.contains(...)`, etc.
+                            laby_with_walls[y][x] = PATH_CHAR;
+                            laby_with_walls_values[y][x] = left_val; 
+                        }
+                    }
+                }
+
+                // 2) Vertical corridor: (y is even, x is odd)
+                //    The cell centers are at (y-1, x) and (y+1, x)
+                if y % 2 == 0 && x % 2 == 1 {
+                    if y > 0 && y + 1 < height {
+                        let top_val    = laby_with_walls_values[y - 1][x];
+                        let bottom_val = laby_with_walls_values[y + 1][x];
+                        if top_val >= 0 && bottom_val == top_val {
+                            laby_with_walls[y][x] = PATH_CHAR;
+                            laby_with_walls_values[y][x] = top_val;
+                        }
+                    }
+                }
+
+                // 3) "Corners" – coordinates where x and y are both even – are typically walls or pillars.
+                //    If you want to unify those corners only when 2 or 3 adjacent cells share the same BFS ID,
+                //    you'd do a similar check. But usually, they're left as walls.
+                
             }
         }
     }
