@@ -92,7 +92,19 @@ impl MazeScene {
                 } else if (x as i32, y as i32) == self.maze.goal {
                     self.mark_start_or_goal(cell, draw_x, draw_y, GOAL_CHAR, EMPTY_CHAR, laby_with_walls, laby_with_walls_values);
                 } else if self.shortest_path.contains(&(x, y)) {
-                    self.mark_walls(cell, draw_x, draw_y, PATH_CHAR, laby_with_walls, laby_with_walls_values);
+                    // Mark the cell center as path
+                    laby_with_walls[draw_y][draw_x] = PATH_CHAR;
+                    laby_with_walls_values[draw_y][draw_x] = -2; // or whatever BFS marker
+                
+                    // Only open corridor squares if the neighbor is also in the path
+                    self.mark_path_walls_if_neighbor_is_path(
+                        cell,
+                        x,              // Maze coords
+                        y,
+                        &self.shortest_path,
+                        laby_with_walls,
+                        laby_with_walls_values,
+                    );
                 } else {
                     self.mark_walls(cell, draw_x, draw_y, laby_with_walls[draw_y][draw_x],laby_with_walls, laby_with_walls_values);
                 }
@@ -123,23 +135,38 @@ impl MazeScene {
         laby_with_walls: &mut Vec<Vec<char>>,
         laby_with_walls_values: &mut Vec<Vec<i32>>,
     ) {
+        // We'll read the "base" value once, so we don't keep borrowing laby_with_walls_values:
+        let base_value = laby_with_walls_values[draw_y][draw_x];
+    
+        // Inline corridor-opening logic:
+        // (Open only if it's still a wall, to avoid overwriting path chars.)
         if !cell.has_wall_north() && draw_y > 0 {
-            laby_with_walls[draw_y - 1][draw_x] = no_wall_marker;
-            laby_with_walls_values[draw_y - 1][draw_x] = laby_with_walls_values[draw_y][draw_x];
+            if laby_with_walls[draw_y - 1][draw_x] == WALL_CHAR {
+                laby_with_walls[draw_y - 1][draw_x] = no_wall_marker;
+                laby_with_walls_values[draw_y - 1][draw_x] = base_value;
+            }
         }
-        if !cell.has_wall_south() && draw_y < laby_with_walls.len() - 1 {
-            laby_with_walls[draw_y + 1][draw_x] = no_wall_marker;
-            laby_with_walls_values[draw_y + 1][draw_x] = laby_with_walls_values[draw_y][draw_x];
+        if !cell.has_wall_south() && draw_y + 1 < laby_with_walls.len() {
+            if laby_with_walls[draw_y + 1][draw_x] == WALL_CHAR {
+                laby_with_walls[draw_y + 1][draw_x] = no_wall_marker;
+                laby_with_walls_values[draw_y + 1][draw_x] = base_value;
+            }
         }
         if !cell.has_wall_west() && draw_x > 0 {
-            laby_with_walls[draw_y][draw_x - 1] = no_wall_marker;
-            laby_with_walls_values[draw_y][draw_x - 1] = laby_with_walls_values[draw_y][draw_x];
+            if laby_with_walls[draw_y][draw_x - 1] == WALL_CHAR {
+                laby_with_walls[draw_y][draw_x - 1] = no_wall_marker;
+                laby_with_walls_values[draw_y][draw_x - 1] = base_value;
+            }
         }
-        if !cell.has_wall_east() && draw_x < laby_with_walls[0].len() - 1 {
-            laby_with_walls[draw_y][draw_x + 1] = no_wall_marker;
-            laby_with_walls_values[draw_y][draw_x + 1] = laby_with_walls_values[draw_y][draw_x];
+        if !cell.has_wall_east() && draw_x + 1 < laby_with_walls[0].len() {
+            if laby_with_walls[draw_y][draw_x + 1] == WALL_CHAR {
+                laby_with_walls[draw_y][draw_x + 1] = no_wall_marker;
+                laby_with_walls_values[draw_y][draw_x + 1] = base_value;
+            }
         }
     }
+    
+    
 
     fn render_maze(
         &self,
@@ -172,6 +199,68 @@ impl MazeScene {
             }
         }
     }
+
+    fn mark_path_walls_if_neighbor_is_path(
+        &self,
+        cell: &crate::data::data_structures::Cell,
+        maze_x: usize,
+        maze_y: usize,
+        shortest_path: &[(usize, usize)],
+        laby_with_walls: &mut [Vec<char>],
+        laby_with_walls_values: &mut [Vec<i32>],
+    ) {
+        // Convert from Maze coords to ASCII grid coords
+        let draw_x = maze_x * 2 + 1;
+        let draw_y = maze_y * 2 + 1;
+        let base_value = laby_with_walls_values[draw_y][draw_x];
+    
+        // For each direction, only open the corridor as PATH_CHAR if
+        //  (a) the cell does NOT have a wall in that direction
+        //  (b) the neighbor is also in shortest_path
+        // Otherwise, we leave it as a wall or whatever it was.
+    
+        // North neighbor in Maze coords is (maze_x, maze_y - 1)
+        if !cell.has_wall_north() && maze_y > 0
+            && shortest_path.contains(&(maze_x, maze_y - 1))
+        {
+            // The corridor cell in the ASCII grid is [draw_y - 1][draw_x]
+            if laby_with_walls[draw_y - 1][draw_x] == WALL_CHAR {
+                laby_with_walls[draw_y - 1][draw_x] = PATH_CHAR;
+                laby_with_walls_values[draw_y - 1][draw_x] = base_value;
+            }
+        }
+    
+        // South
+        if !cell.has_wall_south() && maze_y + 1 < self.maze.height
+            && shortest_path.contains(&(maze_x, maze_y + 1))
+        {
+            if laby_with_walls[draw_y + 1][draw_x] == WALL_CHAR {
+                laby_with_walls[draw_y + 1][draw_x] = PATH_CHAR;
+                laby_with_walls_values[draw_y + 1][draw_x] = base_value;
+            }
+        }
+    
+        // West
+        if !cell.has_wall_west() && maze_x > 0
+            && shortest_path.contains(&(maze_x - 1, maze_y))
+        {
+            if laby_with_walls[draw_y][draw_x - 1] == WALL_CHAR {
+                laby_with_walls[draw_y][draw_x - 1] = PATH_CHAR;
+                laby_with_walls_values[draw_y][draw_x - 1] = base_value;
+            }
+        }
+    
+        // East
+        if !cell.has_wall_east() && maze_x + 1 < self.maze.width
+            && shortest_path.contains(&(maze_x + 1, maze_y))
+        {
+            if laby_with_walls[draw_y][draw_x + 1] == WALL_CHAR {
+                laby_with_walls[draw_y][draw_x + 1] = PATH_CHAR;
+                laby_with_walls_values[draw_y][draw_x + 1] = base_value;
+            }
+        }
+    }
+    
 
     fn choose_color(
         &self,
