@@ -55,6 +55,14 @@ impl MenuItem for Button {
         }
     }
 
+    fn get_width(&self) -> i32 {
+        self.width
+    }
+
+    fn get_height(&self) -> i32 {
+        self.height
+    }
+
     fn draw_ascii(&self, engine: &mut ConsoleEngine) {
         // Draw the label centered and styled
         let label_art = to_art(self.label.to_string(), "", 0, 0, 0); // Result<String, String>

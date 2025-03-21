@@ -21,6 +21,15 @@ impl MenuItem for Text {
             self.draw_standard(engine);
         }
     }
+
+    fn get_width(&self) -> i32 {
+        self.content.len() as i32
+    }
+
+    fn get_height(&self) -> i32 {
+        1
+    }
+
     fn draw_standard(&self, engine: &mut ConsoleEngine) {
         engine.print(self.x, self.y, &self.content);
     }

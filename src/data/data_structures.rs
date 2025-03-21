@@ -1,5 +1,5 @@
 // Maze data structure
-use rand::Rng;
+use rand::{random, Rng};
 use std::{
     fmt::{Debug, Display, Formatter, Result},
     io::Write,
@@ -34,12 +34,20 @@ impl Maze {
             cells.push(row);
         });
 
+        let start = (random::<usize>() % width as usize, random::<usize>() % height as usize);
+        let goal =  (random::<usize>() % width as usize, random::<usize>() % height as usize);
+
+
+
+
+
+
         Maze {
             width,
             height,
             cells,
-            start: (1, 1),
-            goal: (width as i32 - 2, height as i32 - 2),
+            start: (start.0 as i32, start.1 as i32),
+            goal: (goal.0 as i32, goal.1 as i32),
         }
     }
 

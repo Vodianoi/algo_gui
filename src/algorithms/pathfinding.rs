@@ -10,6 +10,7 @@ use std::{
 use crate::{data::data_structures::Maze, menu::maze_scene::MazeScene};
 
 use super::maze_generation::Algorithm;
+use std::collections::VecDeque;
 
 #[derive(Clone)]
 pub struct BFS;
@@ -17,6 +18,9 @@ pub struct BFS;
 impl Algorithm for BFS {
     fn run(&self, scene: Arc<Mutex<MazeScene>>, running: Arc<AtomicBool>) {
         let mut maze = scene.lock().unwrap().maze.clone();
+        maze.clear_path();
+        maze.clear_values();
+        scene.lock().unwrap().maze = maze.clone();
         let start = maze.start;
         let goal = maze.goal;
         let width = maze.width;
@@ -26,7 +30,8 @@ impl Algorithm for BFS {
 
         let goal = (goal.0 as usize, goal.1 as usize);
 
-        let mut queue: Vec<(usize, usize)> = vec![start];
+        let mut queue: VecDeque<(usize, usize)> = VecDeque::new();
+        queue.push_back(start);
 
         let mut value = 0;
 
@@ -35,7 +40,9 @@ impl Algorithm for BFS {
         maze.get_cell_mut(start.0 as i32, start.1 as i32).value = value;
 
         while running.load(Ordering::SeqCst) && !queue.is_empty() {
-            let (x, y) = queue.remove(0);
+            let Some((x, y)) = queue.remove(0) else {
+                todo!()
+            };
             {
                 let cell = maze.get_cell_mut(x as i32, y as i32);
                 cell.visited = true;
@@ -58,7 +65,7 @@ impl Algorithm for BFS {
                 let ny = ny as usize;
                 if nx < width && ny < height && !visited[ny][nx] {
                     visited[ny][nx] = true;
-                    queue.push((nx, ny));
+                    queue.push_back((nx, ny));
                 }
             }
         }
@@ -114,18 +121,26 @@ impl BFS {
                     if cell.value == min {
                         path.push((nx, ny));
                         value = min;
-                        maze.get_cell_mut(nx as i32, ny as i32).visited = true;
+
+                        // Update the maze and scene for visualization
+                        let cell = maze.get_cell_mut(nx as i32, ny as i32);
+                        cell.visited = true;
+                        // cell.value = -2;
                         scene.lock().unwrap().shortest_path = path.clone();
-                        thread::sleep(Duration::from_millis(10)); // Adjust visualization speed
+                        scene.lock().unwrap().maze = maze.clone();
+                        thread::sleep(Duration::from_millis(50)); // Adjust visualization speed
 
                         break;
                     }
                 }
             }
         }
+
+        // Mark the entire path as visited and update the scene
         for &(x, y) in &path {
             maze.get_cell_mut(x as i32, y as i32).visited = true;
         }
+        scene.lock().unwrap().shortest_path = path.clone();
         scene.lock().unwrap().maze = maze.clone();
     }
 }

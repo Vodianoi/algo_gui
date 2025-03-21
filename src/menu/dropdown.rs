@@ -44,6 +44,14 @@ impl MenuItem for Dropdown {
         }
     }
 
+    fn get_width(&self) -> i32 {
+        self.width
+    }
+
+    fn get_height(&self) -> i32 {
+        2
+    }
+
     fn draw_ascii(&self, engine: &mut console_engine::ConsoleEngine) {
         let bg_color = if self.selected {
             Color::DarkGrey

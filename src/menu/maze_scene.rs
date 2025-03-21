@@ -24,7 +24,6 @@ pub const GOAL_COLOR: Color = Color::Blue;
 use console_engine::pixel;
 use console_engine::Color;
 use rand::random;
-use rand::Rng;
 
 pub struct MazeScene {
     pub maze: Maze,
@@ -55,89 +54,115 @@ impl MazeScene {
         engine: &mut console_engine::ConsoleEngine,
         colored: bool,
         random_colored: bool,
-        BFS: bool,
+        bfs: bool,
         cache: &mut HashMap<u32, u8>,
     ) {
-        // Adjust the maze dimensions to include walls
-        let new_width = self.maze.width * 2 + 1;
-        let new_height = self.maze.height * 2 + 1;
+        let (new_width, new_height) = (self.maze.width * 2 + 1, self.maze.height * 2 + 1);
 
         let mut laby_with_walls = vec![vec![WALL_CHAR; new_width]; new_height];
         let mut laby_with_walls_values = vec![vec![-1; new_width]; new_height];
 
-        // Construct the maze with walls around it
+        self.populate_maze_with_walls(&mut laby_with_walls, &mut laby_with_walls_values);
+
+        self.render_maze(engine, &laby_with_walls, &laby_with_walls_values, colored, random_colored, bfs, cache);
+    }
+
+    fn populate_maze_with_walls(
+        &self,
+        laby_with_walls: &mut Vec<Vec<char>>,
+        laby_with_walls_values: &mut Vec<Vec<i32>>,
+    ) {
         for y in 0..self.maze.height {
             for x in 0..self.maze.width {
                 let cell = self.maze.get_cell(x as i32, y as i32);
+                let (draw_x, draw_y) = (x * 2 + 1, y * 2 + 1);
+                if self.shortest_path.contains(&(x as usize, y as usize)) {
+                    laby_with_walls[draw_y][draw_x] = PATH_CHAR;
+                    laby_with_walls_values[draw_y][draw_x] = -2;
 
-                // Draw the cell's position
-                let draw_x = x * 2 + 1;
-                let draw_y = y * 2 + 1;
-                // Mark visited cells or path
-                if cell.visited {
-                    laby_with_walls[draw_y][draw_x] = VISITED_CHAR;
-                } else {
-                    laby_with_walls[draw_y][draw_x] = EMPTY_CHAR;
+                }
+                else {
+                    laby_with_walls[draw_y][draw_x] = if cell.visited { VISITED_CHAR } else { EMPTY_CHAR };
+                    laby_with_walls_values[draw_y][draw_x] = cell.value;
                 }
 
-                // Draw walls if needed
 
-                laby_with_walls_values[draw_y][draw_x] = cell.value;
                 if (x as i32, y as i32) == self.maze.start {
-                    laby_with_walls[draw_y][draw_x] = START_CHAR;
+                    self.mark_start_or_goal(cell, draw_x, draw_y, START_CHAR, EMPTY_CHAR, laby_with_walls, laby_with_walls_values);
                 } else if (x as i32, y as i32) == self.maze.goal {
-                    laby_with_walls[draw_y][draw_x] = GOAL_CHAR;
-                }
-
-                if !cell.has_wall_north() && draw_y > 0 {
-                    laby_with_walls[draw_y - 1][draw_x] = laby_with_walls[draw_y][draw_x];
-                    laby_with_walls_values[draw_y - 1][draw_x] =
-                        laby_with_walls_values[draw_y][draw_x];
-                }
-                if !cell.has_wall_south() && draw_y < new_height - 1 {
-                    laby_with_walls[draw_y + 1][draw_x] = laby_with_walls[draw_y][draw_x];
-                    laby_with_walls_values[draw_y + 1][draw_x] =
-                        laby_with_walls_values[draw_y][draw_x];
-                }
-                if !cell.has_wall_west() && draw_x > 0 {
-                    laby_with_walls[draw_y][draw_x - 1] = laby_with_walls[draw_y][draw_x];
-                    laby_with_walls_values[draw_y][draw_x - 1] =
-                        laby_with_walls_values[draw_y][draw_x];
-                }
-                if !cell.has_wall_east() && draw_x < new_width - 1 {
-                    laby_with_walls[draw_y][draw_x + 1] = laby_with_walls[draw_y][draw_x];
-                    laby_with_walls_values[draw_y][draw_x + 1] =
-                        laby_with_walls_values[draw_y][draw_x];
+                    self.mark_start_or_goal(cell, draw_x, draw_y, GOAL_CHAR, EMPTY_CHAR, laby_with_walls, laby_with_walls_values);
+                } else if self.shortest_path.contains(&(x, y)) {
+                    self.mark_walls(cell, draw_x, draw_y, PATH_CHAR, laby_with_walls, laby_with_walls_values);
+                } else {
+                    self.mark_walls(cell, draw_x, draw_y, laby_with_walls[draw_y][draw_x],laby_with_walls, laby_with_walls_values);
                 }
             }
         }
+    }
 
-        // Finally, render the maze to the console
-        (0..new_height).for_each(|y| {
-            for x in 0..new_width {
-                let ch = laby_with_walls[y][x];
+    fn mark_start_or_goal(
+        &self,
+        cell: &crate::data::data_structures::Cell,
+        draw_x: usize,
+        draw_y: usize,
+        marker: char,
+        no_wall_marker: char,
+        laby_with_walls: &mut Vec<Vec<char>>,
+        laby_with_walls_values: &mut Vec<Vec<i32>>,
+    ) {
+        laby_with_walls[draw_y][draw_x] = marker;
+        self.mark_walls(cell, draw_x, draw_y, no_wall_marker, laby_with_walls, laby_with_walls_values);
+    }
 
+    fn mark_walls(
+        &self,
+        cell: &crate::data::data_structures::Cell,
+        draw_x: usize,
+        draw_y: usize,
+        no_wall_marker: char,
+        laby_with_walls: &mut Vec<Vec<char>>,
+        laby_with_walls_values: &mut Vec<Vec<i32>>,
+    ) {
+        if !cell.has_wall_north() && draw_y > 0 {
+            laby_with_walls[draw_y - 1][draw_x] = no_wall_marker;
+            laby_with_walls_values[draw_y - 1][draw_x] = laby_with_walls_values[draw_y][draw_x];
+        }
+        if !cell.has_wall_south() && draw_y < laby_with_walls.len() - 1 {
+            laby_with_walls[draw_y + 1][draw_x] = no_wall_marker;
+            laby_with_walls_values[draw_y + 1][draw_x] = laby_with_walls_values[draw_y][draw_x];
+        }
+        if !cell.has_wall_west() && draw_x > 0 {
+            laby_with_walls[draw_y][draw_x - 1] = no_wall_marker;
+            laby_with_walls_values[draw_y][draw_x - 1] = laby_with_walls_values[draw_y][draw_x];
+        }
+        if !cell.has_wall_east() && draw_x < laby_with_walls[0].len() - 1 {
+            laby_with_walls[draw_y][draw_x + 1] = no_wall_marker;
+            laby_with_walls_values[draw_y][draw_x + 1] = laby_with_walls_values[draw_y][draw_x];
+        }
+    }
+
+    fn render_maze(
+        &self,
+        engine: &mut console_engine::ConsoleEngine,
+        laby_with_walls: &[Vec<char>],
+        laby_with_walls_values: &[Vec<i32>],
+        colored: bool,
+        random_colored: bool,
+        bfs: bool,
+        cache: &mut HashMap<u32, u8>,
+    ) {
+        for (y, row) in laby_with_walls.iter().enumerate() {
+            for (x, &ch) in row.iter().enumerate() {
+                let value = laby_with_walls_values[y][x];
                 let pixel_char = if colored {
                     pixel::pxl_bg(
                         ' ',
-                        self.choose_color(
-                            ch,
-                            laby_with_walls_values[y][x],
-                            random_colored,
-                            BFS,
-                            cache,
-                        ),
+                        self.choose_color(ch, value, random_colored, bfs, cache),
                     )
                 } else {
                     pixel::pxl_fg(
-                        ch,
-                        self.choose_color(
-                            ch,
-                            laby_with_walls_values[y][x],
-                            random_colored,
-                            BFS,
-                            cache,
-                        ),
+                        value.to_string().chars().next().unwrap_or(' '),
+                        self.choose_color(ch, value, random_colored, bfs, cache),
                     )
                 };
 
@@ -145,7 +170,7 @@ impl MazeScene {
                     engine.set_pxl(self.x + (x * 2) as i32 + i, self.y + y as i32, pixel_char);
                 }
             }
-        });
+        }
     }
 
     fn choose_color(
@@ -159,14 +184,27 @@ impl MazeScene {
         if ch == WALL_CHAR {
             return self.color_wall;
         }
+        if ch == GOAL_CHAR {
+            return GOAL_COLOR;
+        }
+        if ch == START_CHAR {
+            return START_COLOR;
+        }
         if random_colored {
             // Return a random color based on the value of the character (use hash)
-
             return self.get_color_for_cell(value as u32, cache);
-        } else if bfs && value > 0 {
+        } else if bfs {
+            
+            if value == -1 {
+                return self.color_path;
+            }
+            else if value == -2 {
+                return self.color_visited;
+            }
+
             // Return a color from gradient, percentage is cell value / maze size
             let percentage = value as f32 / (self.maze.width * self.maze.height) as f32 * 100.0;
-            let gradient_colors = self.create_gradient((255, 0, 0), 20);
+            let gradient_colors = self.create_gradient((0, 126, 126), 100);
             return Color::AnsiValue(self.get_color_from_percentage(&gradient_colors, percentage));
         }
         match ch {
@@ -211,14 +249,19 @@ impl MazeScene {
 
     /// Generates a color based on cell value.
     fn get_color_for_cell(&self, v: u32, cache: &mut HashMap<u32, u8>) -> Color {
+
+        if v == 0 {
+            return self.color_path;
+        }
         // Check if the color is already cached
         if let Some(color) = cache.get(&v) {
             return Color::AnsiValue(*color);
         }
 
+
+
         let r = random::<u8>();
         let g = random::<u8>();
-
         let b = random::<u8>();
 
         let color = Color::Rgb { r, g, b };
@@ -228,6 +271,7 @@ impl MazeScene {
 
         color
     }
+
 }
 
 impl Clone for MazeScene {

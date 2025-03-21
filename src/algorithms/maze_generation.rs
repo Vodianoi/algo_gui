@@ -1,6 +1,7 @@
-use crate::data::data_structures::{Cell, Graph, Maze};
+// use crate::data::data_structures::{Cell, Graph, Maze};
 use crate::menu::maze_scene::MazeScene;
 
+use console_engine::crossterm;
 use rand::seq::SliceRandom;
 use rand::Rng;
 use std::any::Any;
@@ -55,7 +56,6 @@ impl Algorithm for RecursiveBacktracker {
         let mut stack: Vec<(usize, usize)> = Vec::new();
         let mut visited: Vec<Vec<bool>> = vec![vec![false; width]; height];
         let mut current = (rng.gen_range(0..width), rng.gen_range(0..height));
-        let mut count = 0;
         visited[current.1][current.0] = true;
         maze.get_cell_mut(current.0 as i32, current.1 as i32)
             .visited = true;
@@ -111,7 +111,6 @@ impl Algorithm for KruskalAlgorithm {
         let height = maze.height;
         let mut sets: Vec<Vec<(usize, usize)>> = Vec::new();
         let mut walls: Vec<(usize, usize, usize, usize)> = Vec::new();
-        let mut count = 0;
         // Initialize each cell as a separate set
         for y in 0..height {
             for x in 0..width {
@@ -163,9 +162,9 @@ impl Algorithm for KruskalAlgorithm {
         }
 
         // Final update of the maze for visualization
-        thread::sleep(Duration::from_secs(2));
-        maze.clear_path();
-        maze.clear_values();
+        // thread::sleep(Duration::from_secs(2));
+        // maze.clear_path();
+        // maze.clear_values();
         scene.lock().unwrap().maze = maze.clone();
     }
 
@@ -284,7 +283,7 @@ impl Algorithm for EllerAlgorithm {
                         maze.remove_wall(x as i32, y as i32, (x + 1) as i32, y as i32);
 
                         // Update set references
-                        for ((sx, sy), set) in sets.iter_mut() {
+                        for ((_sx,_sy), set) in sets.iter_mut() {
                             if *set == right_set {
                                 *set = current_set;
                             }
@@ -333,7 +332,7 @@ impl Algorithm for EllerAlgorithm {
             let right_set = sets[&(x + 1, final_y)];
             if left_set != right_set {
                 maze.remove_wall(x as i32, final_y as i32, (x + 1) as i32, final_y as i32);
-                for ((sx, sy), set) in sets.iter_mut() {
+                for ((_sx, _sy), set) in sets.iter_mut() {
                     if *set == right_set {
                         *set = left_set;
                     }
@@ -364,6 +363,7 @@ fn find_set(sets: &Vec<Vec<(usize, usize)>>, x: usize, y: usize) -> Vec<(usize, 
     }
     vec![]
 }
+
 
 // Algorithm runner using multithreading and visualization
 pub struct AlgorithmRunner {
@@ -398,19 +398,29 @@ impl AlgorithmRunner {
             current_algorithm_clone.store(0, Ordering::Relaxed);
             let algorithm_length = algorithms.len();
 
-            for algorithm in algorithms {
+            for (index, algorithm) in algorithms.into_iter().enumerate() {
+                // Update the current algorithm index
+                current_algorithm_clone.store(index, Ordering::Relaxed);
+
                 // Run each algorithm only if `running` is still true
                 if running_clone.load(Ordering::SeqCst) {
                     algorithm.run(scene_clone.clone(), running_clone.clone());
                 } else {
                     break;
                 }
-                // Add 1 modulo the number of algorithms to the current index
-                current_algorithm_clone.fetch_add(1, Ordering::Relaxed);
-                current_algorithm_clone.store(
-                    current_algorithm_clone.load(Ordering::Relaxed) % algorithm_length,
-                    Ordering::Relaxed,
-                );
+
+                // Wait for user input (space bar) to start the next algorithm
+                if index < algorithm_length - 1 {
+                    while running_clone.load(Ordering::SeqCst) {
+                        if let Ok(true) = crossterm::event::poll(Duration::from_millis(100)) {
+                            if let crossterm::event::Event::Key(key_event) = crossterm::event::read().unwrap() {
+                                if key_event.code == crossterm::event::KeyCode::Char(' ') {
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
             }
         });
     }
@@ -434,18 +444,19 @@ impl AlgorithmRunner {
     }
 
     fn get_settings(&self, algorithm: &dyn Algorithm) -> (bool, bool, bool) {
+        let colored = true;
         if algorithm.as_any().is::<RecursiveBacktracker>() {
-            (true, false, false)
+            (colored, false, false)
         } else if algorithm.as_any().is::<KruskalAlgorithm>() {
-            (true, true, false)
+            (colored, true, false)
         } else if algorithm.as_any().is::<PrimsAlgorithm>() {
-            (true, false, false)
+            (colored, false, false)
         } else if algorithm.as_any().is::<BFS>() {
-            (true, false, true)
+            (colored, false, true)
         } else if algorithm.as_any().is::<DFS>() {
-            (true, false, false)
+            (colored, false, false)
         } else if algorithm.as_any().is::<EllerAlgorithm>() {
-            (true, false, false)
+            (colored, false, false)
         } else {
             self.last_settings
         }
