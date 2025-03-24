@@ -1,7 +1,5 @@
-use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
-use std::thread;
-use std::time::Duration;
+
 
 use crate::algorithms::sorting::*;
 use crate::menu::{
@@ -9,6 +7,7 @@ use crate::menu::{
 };
 use crate::scenes::sort_scene::SortScene;
 use console_engine::ConsoleEngine;
+use rand::seq::SliceRandom;
 use termsize;
 
 pub fn run_sort_menu(engine: &mut ConsoleEngine) {
@@ -46,15 +45,13 @@ pub fn run_sort_menu(engine: &mut ConsoleEngine) {
 
     // Create the main menu with the dropdown and start button
     let menu_items: Vec<Box<dyn MenuItem>> = vec![sort_dropdown, start_button];
-    let screen_size = termsize::get().unwrap();
-    let menu_width = screen_size.cols as i32 / 4;
-    let menu_height = screen_size.rows as i32 - 2;
-    let display_width = screen_size.cols * 3 / 4 - 2;
-    let display_height = screen_size.rows;
-    let x = screen_size.cols as i32 - display_width as i32;
+    let screen = engine.get_screen();
+    let menu_width = screen.get_width() as i32 / 4;
+    let menu_height = screen.get_height() as i32 - 2;
+    let display_width = screen.get_width() * 3 / 4 - 2;
+    let display_height = screen.get_height() - 2;
+    let x = screen.get_width() as i32 - display_width as i32;
     let y = -2;
-
-    let nb_values = 20;
 
     let mut sort_menu = Menu::new(0, 0, menu_width, menu_height, menu_items, Alignment::Left);
 
@@ -79,35 +76,31 @@ pub fn run_sort_menu(engine: &mut ConsoleEngine) {
             let form_values = sort_menu.get_values();
             let selected_algorithm = form_values[0].clone();
 
-            // Generate a random dataset for sorting
-            let data = (0..nb_values).map(|_| rand::random::<i32>() % 100).collect();
+            // Generate a dataset for sorting, scaled to fit the screen width and height
+            let data = (0..display_width / 2) // Adjust the number of data points based on the display width
+            .map(|_| rand::random::<u32>() % (display_height as u32)) // Normalize values to fit the display height
+            .map(|value| value as i32) // Convert to i32 for compatibility
+            .collect::<Vec<i32>>();
 
-            // Run the sorting scene with the selected algorithm
-            // run_sort_scene(engine, &selected_algorithm, data);
 
             let algorithm_name = selected_algorithm.as_str();
             // Map algorithm names to their corresponding implementations
             let algorithm: Box<dyn SortingAlgorithm> = match algorithm_name {
                 "Bubble Sort" => Box::new(BubbleSort),
                 // Add other sorting algorithms here
-                // "Quick Sort" => Box::new(QuickSort),
-                // "Merge Sort" => Box::new(MergeSort),
-                // "Heap Sort" => Box::new(HeapSort),
-                // "Shell Sort" => Box::new(ShellSort),
-                // "Insertion Sort" => Box::new(InsertionSort),
-                // "Selection Sort" => Box::new(SelectionSort),
+                "Selection Sort" => Box::new(SelectionSort),
                 _ => Box::new(BubbleSort), // Default to Bubble Sort
             };
 
             // Initialize the sorting scene
             let scene = SortScene::new(data, 2, x, y);
             let runner = SortingRunner::new(algorithm, scene);
-            let running =  Arc::clone(&runner.running);
+            let running = runner.running.clone();
             
             runner.start();
 
             // Render the maze while the algorithm is running
-            while running.lock().unwrap().clone() {
+            while running.get() {
                 engine.wait_frame();
                 engine.clear_screen();
 

@@ -73,8 +73,7 @@ impl Algorithm for RecursiveBacktracker {
                     visited[current.1][current.0] = true;
                     stack.push(current);
                     // Update scene and visualization after each step
-                    scene.lock().unwrap().maze = maze.clone();
-                    thread::sleep(Duration::from_millis(10));
+                    update_maze(&scene, &maze);
                 }
                 None => {
                     current = stack.pop().unwrap();
@@ -86,7 +85,7 @@ impl Algorithm for RecursiveBacktracker {
         thread::sleep(Duration::from_secs(2));
         maze.clear_path();
         maze.clear_values();
-        scene.lock().unwrap().maze = maze.clone();
+        update_maze(&scene, &maze);
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -157,8 +156,7 @@ impl Algorithm for KruskalAlgorithm {
             }
 
             // Update scene and visualization after each step
-            scene.lock().unwrap().maze = maze.clone();
-            thread::sleep(Duration::from_millis(10));
+            update_maze(&scene, &maze);
         }
 
         // Final update of the maze for visualization
@@ -176,6 +174,8 @@ impl Algorithm for KruskalAlgorithm {
         self
     }
 }
+
+
 
 #[derive(Clone)]
 pub struct PrimsAlgorithm;
@@ -229,7 +229,7 @@ impl Algorithm for PrimsAlgorithm {
                 }
 
                 // Update the scene for visualization
-                scene.lock().unwrap().maze = maze.clone();
+                update_maze(&scene, &maze);
             }
         }
 
@@ -237,7 +237,7 @@ impl Algorithm for PrimsAlgorithm {
         thread::sleep(Duration::from_secs(2));
         maze.clear_path();
         maze.clear_values();
-        scene.lock().unwrap().maze = maze.clone();
+        update_maze(&scene, &maze);
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -312,13 +312,13 @@ impl Algorithm for EllerAlgorithm {
                             next_set += 1;
                         }
                     }
-                    scene.lock().unwrap().maze = maze.clone();
+                    update_maze(&scene, &maze);
                 }
             }
 
             // Visualize step-by-step for debugging
-            scene.lock().unwrap().maze = maze.clone();
-            thread::sleep(Duration::from_millis(10));
+            update_maze(&scene, &maze);
+
 
             if !running.load(Ordering::SeqCst) {
                 break;
@@ -342,7 +342,7 @@ impl Algorithm for EllerAlgorithm {
         thread::sleep(Duration::from_secs(2));
         maze.clear_path();
         maze.clear_values();
-        scene.lock().unwrap().maze = maze.clone();
+        update_maze(&scene, &maze);
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -492,4 +492,10 @@ fn choose_random_neighbor(
     } else {
         Some(*neighbors.choose(&mut rand::thread_rng()).unwrap())
     }
+}
+
+
+fn update_maze(scene: &Arc<Mutex<MazeScene>>, maze: &crate::data::data_structures::Maze) {
+    scene.lock().unwrap().maze = maze.clone();
+    thread::sleep(Duration::from_millis(10));
 }
