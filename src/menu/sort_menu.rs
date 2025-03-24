@@ -1,18 +1,25 @@
-use std::sync::Arc;
-
-
 use crate::algorithms::sorting::*;
 use crate::menu::{
     alignment::Alignment, button::Button, dropdown::Dropdown, menu::Menu, menu_item::MenuItem,
 };
 use crate::scenes::sort_scene::SortScene;
 use console_engine::ConsoleEngine;
-use rand::seq::SliceRandom;
-use termsize;
 
 pub fn run_sort_menu(engine: &mut ConsoleEngine) {
-    // Define the dropdown items for sorting algorithms
-    let sort_items = vec![
+    let sort_items = get_sort_items();
+    let sort_dropdown = create_sort_dropdown(&sort_items);
+    let start_button = create_start_button();
+
+    let menu_items: Vec<Box<dyn MenuItem>> = vec![sort_dropdown, start_button];
+    let (menu_width, menu_height, display_width, display_height, x, y) = calculate_dimensions(engine);
+
+    let mut sort_menu = Menu::new(0, 0, menu_width, menu_height, menu_items, Alignment::Left);
+
+    main_loop(engine, &mut sort_menu, display_width as usize, display_height as usize, x, y);
+}
+
+fn get_sort_items() -> Vec<String> {
+    vec![
         "Bubble Sort".to_string(),
         "Quick Sort".to_string(),
         "Merge Sort".to_string(),
@@ -20,31 +27,33 @@ pub fn run_sort_menu(engine: &mut ConsoleEngine) {
         "Shell Sort".to_string(),
         "Insertion Sort".to_string(),
         "Selection Sort".to_string(),
-    ];
+    ]
+}
 
-    // Create the dropdown menu item for sorting algorithms
-    let sort_dropdown = Box::new(Dropdown {
+fn create_sort_dropdown(sort_items: &[String]) -> Box<Dropdown> {
+    Box::new(Dropdown {
         x: 5,
         y: 5,
         width: 22,
-        options: sort_items,
+        options: sort_items.to_vec(),
         selected_index: 0,
         is_open: false,
         selected: false,
-    });
+    })
+}
 
-    // Create the "Start" button to begin the sorting visualization
-    let start_button = Box::new(Button {
+fn create_start_button() -> Box<Button> {
+    Box::new(Button {
         x: 5,
         y: 15,
         width: 20,
         height: 3,
         label: "Start".to_string(),
         selected: false,
-    });
+    })
+}
 
-    // Create the main menu with the dropdown and start button
-    let menu_items: Vec<Box<dyn MenuItem>> = vec![sort_dropdown, start_button];
+fn calculate_dimensions(engine: &ConsoleEngine) -> (i32, i32, u32, u32, i32, i32) {
     let screen = engine.get_screen();
     let menu_width = screen.get_width() as i32 / 4;
     let menu_height = screen.get_height() as i32 - 2;
@@ -52,74 +61,92 @@ pub fn run_sort_menu(engine: &mut ConsoleEngine) {
     let display_height = screen.get_height() - 2;
     let x = screen.get_width() as i32 - display_width as i32;
     let y = -2;
+    (menu_width, menu_height, display_width, display_height, x, y)
+}
 
-    let mut sort_menu = Menu::new(0, 0, menu_width, menu_height, menu_items, Alignment::Left);
-
+fn main_loop(
+    engine: &mut ConsoleEngine,
+    sort_menu: &mut Menu,
+    display_width: usize,
+    display_height: usize,
+    x: i32,
+    y: i32,
+) {
     loop {
         engine.wait_frame();
         engine.clear_screen();
 
-        // Draw and handle input for the menu
         sort_menu.draw(engine);
         sort_menu.handle_input(engine);
         sort_menu.handle_key_event(engine);
 
-        // Exit the loop if the user requests to quit
         if sort_menu._quit {
             break;
         }
 
-        // Handle "Start" button confirmation
         if sort_menu.confirmed() {
             sort_menu.set_confirmed(false);
-
-            let form_values = sort_menu.get_values();
-            let selected_algorithm = form_values[0].clone();
-
-            // Generate a dataset for sorting, scaled to fit the screen width and height
-            let data = (0..display_width / 2) // Adjust the number of data points based on the display width
-            .map(|_| rand::random::<u32>() % (display_height as u32)) // Normalize values to fit the display height
-            .map(|value| value as i32) // Convert to i32 for compatibility
-            .collect::<Vec<i32>>();
-
-
-            let algorithm_name = selected_algorithm.as_str();
-            // Map algorithm names to their corresponding implementations
-            let algorithm: Box<dyn SortingAlgorithm> = match algorithm_name {
-                "Bubble Sort" => Box::new(BubbleSort),
-                // Add other sorting algorithms here
-                "Selection Sort" => Box::new(SelectionSort),
-                _ => Box::new(BubbleSort), // Default to Bubble Sort
-            };
-
-            // Initialize the sorting scene
-            let scene = SortScene::new(data, 2, x, y);
-            let runner = SortingRunner::new(algorithm, scene);
-            let running = runner.running.clone();
-            
-            runner.start();
-
-            // Render the maze while the algorithm is running
-            while running.get() {
-                engine.wait_frame();
-                engine.clear_screen();
-
-                sort_menu.draw(engine);
-                sort_menu.handle_input(engine);
-                sort_menu.handle_key_event(engine);
-
-                if sort_menu._quit || sort_menu.confirmed() {
-                    sort_menu._quit = false;
-                    runner.stop();
-                    break;
-                }
-
-                runner.render(engine);
-
-                engine.draw();
-            }
+            handle_sorting(engine, sort_menu, display_width, display_height, x, y);
         }
 
         engine.draw();
+    }
+}
+
+fn handle_sorting(
+    engine: &mut ConsoleEngine,
+    sort_menu: &mut Menu,
+    display_width: usize,
+    display_height: usize,
+    x: i32,
+    y: i32,
+) {
+    let form_values = sort_menu.get_values();
+    let selected_algorithm = form_values[0].clone();
+
+    let data = generate_dataset(display_width, display_height);
+    let algorithm = get_sorting_algorithm(&selected_algorithm);
+
+    let scene = SortScene::new(data, 2, x, y);
+    let runner = SortingRunner::new(algorithm, scene);
+    let running = runner.running.clone();
+
+    runner.start();
+
+    while running.get() {
+        engine.wait_frame();
+        engine.clear_screen();
+
+        sort_menu.draw(engine);
+        sort_menu.handle_input(engine);
+        sort_menu.handle_key_event(engine);
+
+        if sort_menu._quit || sort_menu.confirmed() {
+            sort_menu._quit = false;
+            runner.stop();
+            break;
+        }
+
+        // Render the sorting scene with highlighted indices
+        runner.render(engine); // Pass indices to highlight here
+
+        engine.draw();
+    }
+}
+
+fn generate_dataset(display_width: usize, display_height: usize) -> Vec<i32> {
+    (0..display_width / 2)
+        .map(|_| (rand::random::<u32>() % (display_height as u32)) + 1)
+        .map(|value| value as i32)
+        .collect()
+}
+
+fn get_sorting_algorithm(name: &str) -> Box<dyn SortingAlgorithm> {
+    match name {
+        "Bubble Sort" => Box::new(BubbleSort),
+        "Selection Sort" => Box::new(SelectionSort),
+        "Insertion Sort" => Box::new(InsertionSort),
+        "Merge Sort" => Box::new(MergeSort),
+        _ => Box::new(BubbleSort),
     }
 }

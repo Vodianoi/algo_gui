@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use console_engine::ConsoleEngine;
+use console_engine::{Color, ConsoleEngine};
 
 use crate::scenes::sort_scene::SortScene;
 
@@ -45,14 +45,21 @@ impl SortingRunner {
 
         // Start the sorting thread
         algorithm.sort(scene, running);
+
+        // After sorting, make a last loop on all data to highlight it
+        let data = self.scene.0.lock().unwrap().buffer.back().unwrap().clone();
+        for i in 0..data.len() {
+                // Highlight from 0 to i
+                let highlight = (0..=i).collect();
+                let highlight_color = Color::Green;
+
+                self.scene.update(data.clone(), highlight, highlight_color);
+            
+        }
     }
 
     pub fn stop(&self) {
         self.running.set(false);
-    }
-
-    pub fn get_data(&self) -> Vec<i32> {
-        self.scene.get_data()
     }
 
     pub fn render(&self, engine: &mut ConsoleEngine) {
@@ -87,7 +94,8 @@ impl SortingAlgorithm for BubbleSort {
                 }
 
                 // Update the scene data for visualization
-                scene.update(data.clone());
+                let highlight = vec![j, j + 1];
+                scene.update(data.clone(), highlight, Color::Red);
             }
         }
     }
@@ -118,12 +126,133 @@ impl SortingAlgorithm for SelectionSort {
             data.swap(i, min_index);
 
             // Update the scene data for visualization
-            scene.update(data.clone());
+            let highlight = vec![i, min_index];
+            scene.update(data.clone(), highlight, Color::Red);
         }
     }
 
     fn clone_box(&self) -> Box<dyn SortingAlgorithm> {
         Box::new(self.clone())
+    }
+}
+
+
+#[derive(Clone)]
+pub struct InsertionSort;
+
+impl SortingAlgorithm for InsertionSort {
+    fn sort(&self, scene: SharedSortScene, running: SharedBool) {
+        let mut data = scene.get_data();
+        for i in 1..data.len() {
+            let key = data[i];
+            let mut j = i;
+            while j > 0 && data[j - 1] > key {
+                if !running.get() {
+                    return; // Stop sorting if the `running` flag is set to false
+                }
+
+                data[j] = data[j - 1];
+                j -= 1;
+
+                // Update the scene data for visualization
+                let highlight = vec![j, j + 1];
+                scene.update(data.clone(), highlight, Color::Red);
+            }
+            data[j] = key;
+        }
+    }
+
+    fn clone_box(&self) -> Box<dyn SortingAlgorithm> {
+        Box::new(self.clone())
+    }
+}
+
+#[derive(Clone)]
+pub struct MergeSort;
+
+impl SortingAlgorithm for MergeSort {
+    fn sort(&self, scene: SharedSortScene, running: SharedBool) {
+        let mut data = scene.get_data();
+        let n = data.len();
+        let mut temp = data.clone();
+        self.merge_sort(&mut data, &mut temp, 0, n - 1, &scene, &running);
+    }
+
+    fn clone_box(&self) -> Box<dyn SortingAlgorithm> {
+        Box::new(self.clone())
+    }
+
+
+}
+
+impl MergeSort {
+    fn merge_sort(
+        &self,
+        data: &mut Vec<i32>,
+        temp: &mut Vec<i32>,
+        left: usize,
+        right: usize,
+        scene: &SharedSortScene,
+        running: &SharedBool,
+    ) {
+        if left >= right {
+            return;
+        }
+
+        let mid = left + (right - left) / 2;
+        self.merge_sort(data, temp, left, mid, scene, running);
+        self.merge_sort(data, temp, mid + 1, right, scene, running);
+        self.merge(data, temp, left, mid, right, scene, running);
+    }
+
+    fn merge(
+        &self,
+        data: &mut Vec<i32>,
+        temp: &mut Vec<i32>,
+        left: usize,
+        mid: usize,
+        right: usize,
+        scene: &SharedSortScene,
+        running: &SharedBool,
+    ) {
+        let mut i = left;
+        let mut j = mid + 1;
+        let mut k = left;
+
+        while i <= mid && j <= right {
+            if !running.get() {
+                return;
+            }
+
+            if data[i] <= data[j] {
+                temp[k] = data[i];
+                i += 1;
+            } else {
+                temp[k] = data[j];
+                j += 1;
+            }
+
+            k += 1;
+        }
+
+        while i <= mid {
+            temp[k] = data[i];
+            i += 1;
+            k += 1;
+        }
+
+        while j <= right {
+            temp[k] = data[j];
+            j += 1;
+            k += 1;
+        }
+
+        for i in left..=right {
+            data[i] = temp[i];
+        }
+        
+        let highlight = (left..=right).collect();
+        scene.update(data.clone(), highlight, Color::Green);
     }
 }
 
@@ -138,8 +267,8 @@ impl SharedSortScene {
         self.0.lock().unwrap().data.lock().unwrap().clone()
     }
 
-    pub fn update(&self, data: Vec<i32>) {
-        self.0.lock().unwrap().update(data);
+    pub fn update(&self, data: Vec<i32>, highlight: Vec<usize>, highlight_color: Color) {
+        self.0.lock().unwrap().update(data, &highlight, highlight_color);
     }
 
     pub fn render(&self, engine: &mut ConsoleEngine) {

@@ -8,7 +8,7 @@ use crate::data::data_structures::Maze;
 use crate::menu::{
     alignment::Alignment, button::Button, dropdown::Dropdown, menu::Menu, menu_item::MenuItem,
 };
-use console_engine::{ConsoleEngine, KeyCode};
+use console_engine::ConsoleEngine;
 
 use super::super::scenes::maze_scene::MazeScene;
 
