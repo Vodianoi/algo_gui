@@ -5,17 +5,16 @@ use termsize;
 
 use crate::algorithms::maze_generation::*;
 use crate::algorithms::pathfinding::*;
+use crate::data::data_structures::Maze;
 use crate::data::data_structures::MazeContext;
 use crate::data::data_structures::Runnable;
 use crate::data::data_structures::Runner;
-use crate::data::data_structures::Maze;
-use crate::data::data_structures::Scene;
 use crate::menu::{
-    alignment::Alignment, items::button::Button, items::dropdown::Dropdown, menu::Menu, menu_item::MenuItem,
+    alignment::Alignment, items::button::Button, items::dropdown::Dropdown, menu::Menu,
+    menu_item::MenuItem,
 };
 use crate::scenes::maze_scene::MazeScene;
 use console_engine::ConsoleEngine;
-
 
 pub fn run_maze_menu(engine: &mut ConsoleEngine) {
     // Define the dropdown items for maze generation and pathfinding algorithms
@@ -29,28 +28,12 @@ pub fn run_maze_menu(engine: &mut ConsoleEngine) {
     let pathfinding_items = vec!["BFS".to_string(), "DFS".to_string()];
 
     // Create dropdowns for selecting maze and pathfinding algorithms
-    let maze_dropdown = Box::new(Dropdown::new(
-        22,
-        maze_generation_items,
-        0,
-        false,
-        false,
-    ));
+    let maze_dropdown = Box::new(Dropdown::new(22, maze_generation_items, 0, false, false));
 
-    let pathfinding_dropdown = Box::new(Dropdown::new(
-        22,
-        pathfinding_items,
-        0,
-        false,
-        false,
-    ));
+    let pathfinding_dropdown = Box::new(Dropdown::new(22, pathfinding_items, 0, false, false));
 
     // Create the "Start" button
-    let start_button = Box::new(Button::new(
-        20,
-        3,
-        "Start".to_string(),
-    ));
+    let start_button = Box::new(Button::new(20, 3, "Start".to_string()));
 
     // Create the main menu with dropdowns and start button
     let menu_items: Vec<Box<dyn MenuItem>> =
@@ -94,7 +77,7 @@ pub fn run_maze_menu(engine: &mut ConsoleEngine) {
             let maze = Maze::new(maze_width as usize, maze_height as usize);
             let x = screen_size.cols as i32 - display_width as i32;
             let y = 0;
-            let scene = Arc::new(Mutex::new(MazeScene::new(maze.clone(), x, y, 2)));
+            let scene = Arc::new(Mutex::new(MazeScene::new(x, y, 2)));
 
             // Maze generation algorithm selection
             let maze_alg: Box<dyn Runnable<Maze, MazeContext>> = match maze_algorithm.as_str() {
@@ -106,11 +89,12 @@ pub fn run_maze_menu(engine: &mut ConsoleEngine) {
             };
 
             // Pathfinding algorithm selection
-            let path_alg: Box<dyn Runnable<Maze, MazeContext>> = match pathfinding_algorithm.as_str() {
-                "BFS" => Box::new(BFS),
-                "DFS" => Box::new(DFS),
-                _ => Box::new(BFS),
-            };
+            let path_alg: Box<dyn Runnable<Maze, MazeContext>> =
+                match pathfinding_algorithm.as_str() {
+                    "BFS" => Box::new(BFS),
+                    "DFS" => Box::new(DFS),
+                    _ => Box::new(BFS),
+                };
 
             // Determine if running a maze generation or pathfinding algorithm
             let running = Arc::new(AtomicBool::new(true));
@@ -118,7 +102,7 @@ pub fn run_maze_menu(engine: &mut ConsoleEngine) {
             // Start the selected algorithm
             let algorithms = vec![maze_alg, path_alg];
             let mut runner = Runner::new(algorithms, scene, maze);
-            runner.start();
+            runner.start(); // Start the algorithm in a separate thread
 
             // Render the maze while the algorithm is running
             while running.load(std::sync::atomic::Ordering::SeqCst) {

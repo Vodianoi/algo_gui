@@ -1,12 +1,15 @@
 // Maze scene is a simple scene that displays the animation of the maze generation algorithm.
 
 use std::collections::HashMap;
+use std::collections::VecDeque;
 use std::thread;
 use std::time::Duration;
 use std::u8;
 
+use crate::data::data_structures::Cell;
 use crate::data::data_structures::Maze;
 use crate::data::data_structures::MazeContext;
+use crate::data::data_structures::MazeSettings;
 use crate::data::data_structures::Scene;
 
 pub const EMPTY_CHAR: char = ' ';
@@ -27,7 +30,6 @@ use console_engine::Color;
 use rand::random;
 
 pub struct MazeScene {
-    pub maze: Maze,
     pub x: i32,
     pub y: i32,
     pub cell_size: i32,
@@ -35,7 +37,9 @@ pub struct MazeScene {
     pub color_path: Color,
     pub color_visited: Color,
     pub context: MazeContext,
-    pub cache: HashMap<u32, u8>
+    pub cache: HashMap<u32, u8>,
+    pub buffer: VecDeque<(Maze, MazeContext)>, // Buffer for maze states and contexts
+    pub last_frame: Option<(Maze, MazeContext)>, // Last rendered frame
 }
 
 impl Scene<Maze, MazeContext> for MazeScene {
@@ -44,19 +48,17 @@ impl Scene<Maze, MazeContext> for MazeScene {
     }
 
     fn update(&mut self, data: &Maze, context: &MazeContext) {
-        self.context = context.clone();
-        self.maze = data.clone();
+        self.buffer.push_back((data.clone(), context.clone()));
     }
-    
+
     fn as_any(&self) -> &dyn std::any::Any {
         self
     }
 }
 
 impl MazeScene {
-    pub fn new(maze: Maze, x: i32, y: i32, cell_size: i32) -> MazeScene {
+    pub fn new(x: i32, y: i32, cell_size: i32) -> MazeScene {
         MazeScene {
-            maze,
             x,
             y,
             cell_size,
@@ -64,68 +66,99 @@ impl MazeScene {
             color_path: PATH_COLOR,
             color_visited: VISITED_COLOR,
             context: MazeContext::default(),
-            cache: HashMap::new()
+            cache: HashMap::new(),
+            buffer: VecDeque::new(),
+            last_frame: None,
         }
     }
 
-    pub fn get_color_for_cell(&mut self, v: u32) -> Color {
-        if v == 0 {
-            return self.color_path;
+    pub fn draw(&mut self, engine: &mut console_engine::ConsoleEngine) {
+        if let Some((maze, context)) = self.buffer.pop_front().or_else(|| self.last_frame.clone()) {
+            
+            // If maze is last_frame.maze, we don't need to re-render it
+            // if let Some((last_maze, _last_context)) = &self.last_frame {
+            //     if maze == *last_maze{
+            //         return;
+            //     }
+            // }
+
+            self.last_frame = Some((maze.clone(), context.clone()));
+
+            let (new_width, new_height) = (maze.width * 2 + 1, maze.height * 2 + 1);
+
+            let mut laby_with_walls = vec![vec![WALL_CHAR; new_width]; new_height];
+            let mut laby_with_walls_values = vec![vec![-1; new_width]; new_height];
+
+            self.populate_maze_with_walls(&maze, &mut laby_with_walls, &mut laby_with_walls_values);
+
+            if context.settings.bfs {
+                self.unify_corridors_globally(&mut laby_with_walls, &mut laby_with_walls_values);
+            }
+
+            self.render_maze(
+                engine,
+                &laby_with_walls,
+                &laby_with_walls_values,
+                &context.settings,
+            );
         }
-        // Check if the color is already cached
-        if let Some(color) = self.cache.get(&v) {
-            return Color::AnsiValue(*color);
-        }
-
-        let r = random::<u8>();
-        let g = random::<u8>();
-        let b = random::<u8>();
-
-        let color = Color::Rgb { r, g, b };
-
-        // Cache the color
-        self.cache.insert(v, self.rgb_to_ansi(r, g, b));
-
-        color
     }
 
-
-    pub fn draw(
+    fn render_maze(
         &mut self,
         engine: &mut console_engine::ConsoleEngine,
+        laby_with_walls: &[Vec<char>],
+        laby_with_walls_values: &[Vec<i32>],
+        settings: &MazeSettings,
     ) {
-        let (new_width, new_height) = (self.maze.width * 2 + 1, self.maze.height * 2 + 1);
+        for (y, row) in laby_with_walls.iter().enumerate() {
+            for (x, &ch) in row.iter().enumerate() {
+                let value = laby_with_walls_values[y][x];
+                let maze_width = laby_with_walls[0].len();
+                let maze_height = laby_with_walls.len();
+                let pixel_char = if settings.colored {
+                    pixel::pxl_bg(
+                        ' ',
+                        self.choose_color(
+                            &maze_width,
+                            &maze_height,
+                            ch,
+                            value,
+                            settings.random_colors,
+                            settings.bfs,
+                        ),
+                    )
+                } else {
+                    pixel::pxl_fg(
+                        value.to_string().chars().next().unwrap_or(' '),
+                        self.choose_color(
+                            &maze_width,
+                            &maze_height,
+                            ch,
+                            value,
+                            settings.random_colors,
+                            settings.bfs,
+                        ),
+                    )
+                };
 
-        let mut laby_with_walls = vec![vec![WALL_CHAR; new_width]; new_height];
-        let mut laby_with_walls_values = vec![vec![-1; new_width]; new_height];
-
-        {
-            self.populate_maze_with_walls(&mut laby_with_walls, &mut laby_with_walls_values);
+                for i in 0..self.cell_size {
+                    engine.set_pxl(self.x + (x * 2) as i32 + i, self.y + y as i32, pixel_char);
+                }
+                // thread::sleep(Duration::from_millis(100));
+            }
         }
-
-        // 2) Unify corridors only when both adjacent cells share the same BFS/region ID
-        //    This ensures no "extra squares" get path color unless they're truly path
-        if self.context.settings.bfs {
-            self.unify_corridors_globally(&mut laby_with_walls, &mut laby_with_walls_values);
-        }
-        self.render_maze(
-            engine,
-            &laby_with_walls,
-            &laby_with_walls_values,
-            self.context.settings.colored,
-            self.context.settings.random_colors,
-            self.context.settings.bfs,
-        );
     }
 
     fn populate_maze_with_walls(
         &self,
+        maze: &Maze,
         laby_with_walls: &mut Vec<Vec<char>>,
         laby_with_walls_values: &mut Vec<Vec<i32>>,
     ) {
-        for y in 0..self.maze.height {
-            for x in 0..self.maze.width {
-                let cell = self.maze.get_cell(x as i32, y as i32);
+        for y in 0..maze.height {
+            for x in 0..maze.width {
+                let cell = maze.get_cell(x as i32, y as i32);
                 let (draw_x, draw_y) = (x * 2 + 1, y * 2 + 1);
                 if self.context.path.contains(&(x as i32, y as i32)) {
                     laby_with_walls[draw_y][draw_x] = PATH_CHAR;
@@ -139,7 +172,7 @@ impl MazeScene {
                     laby_with_walls_values[draw_y][draw_x] = cell.value;
                 }
 
-                if (x as i32, y as i32) == self.maze.start {
+                if (x as i32, y as i32) == maze.start {
                     self.mark_start_or_goal(
                         cell,
                         draw_x,
@@ -149,7 +182,7 @@ impl MazeScene {
                         laby_with_walls,
                         laby_with_walls_values,
                     );
-                } else if (x as i32, y as i32) == self.maze.goal {
+                } else if (x as i32, y as i32) == maze.goal {
                     self.mark_start_or_goal(
                         cell,
                         draw_x,
@@ -166,6 +199,8 @@ impl MazeScene {
 
                     // Only open corridor squares if the neighbor is also in the path
                     self.mark_path_walls_if_neighbor_is_path(
+                        maze.width,
+                        maze.height,
                         cell,
                         x, // Maze coords
                         y,
@@ -304,42 +339,11 @@ impl MazeScene {
         }
     }
 
-    fn render_maze(
-        &mut self,
-        engine: &mut console_engine::ConsoleEngine,
-        laby_with_walls: &[Vec<char>],
-        laby_with_walls_values: &[Vec<i32>],
-        colored: bool,
-        random_colored: bool,
-        bfs: bool,
-    ) {
-        for (y, row) in laby_with_walls.iter().enumerate() {
-            for (x, &ch) in row.iter().enumerate() {
-                let value = laby_with_walls_values[y][x];
-                let pixel_char = if colored {
-                    pixel::pxl_bg(
-                        ' ',
-                        self.choose_color(ch, value, random_colored, bfs),
-                    )
-                } else {
-                    pixel::pxl_fg(
-                        value.to_string().chars().next().unwrap_or(' '),
-                        self.choose_color(ch, value, random_colored, bfs),
-                    )
-                };
-
-                for i in 0..self.cell_size {
-                    engine.set_pxl(self.x + (x * 2) as i32 + i, self.y + y as i32, pixel_char);
-                }
-                // thread::sleep(Duration::from_millis(100));
-
-            }
-        }
-    }
-
     fn mark_path_walls_if_neighbor_is_path(
         &self,
-        cell: &crate::data::data_structures::Cell,
+        maze_width: usize,
+        maze_height: usize,
+        cell: &Cell,
         maze_x: usize,
         maze_y: usize,
         shortest_path: &[(i32, i32)],
@@ -357,7 +361,10 @@ impl MazeScene {
         // Otherwise, we leave it as a wall or whatever it was.
 
         // North neighbor in Maze coords is (maze_x, maze_y - 1)
-        if !cell.has_wall_north() && maze_y > 0 && shortest_path.contains(&(maze_x as i32, maze_y as i32 - 1)) {
+        if !cell.has_wall_north()
+            && maze_y > 0
+            && shortest_path.contains(&(maze_x as i32, maze_y as i32 - 1))
+        {
             // The corridor cell in the ASCII grid is [draw_y - 1][draw_x]
             if laby_with_walls[draw_y - 1][draw_x] == WALL_CHAR {
                 laby_with_walls[draw_y - 1][draw_x] = PATH_CHAR;
@@ -367,7 +374,7 @@ impl MazeScene {
 
         // South
         if !cell.has_wall_south()
-            && maze_y + 1 < self.maze.height
+            && maze_y + 1 < maze_height
             && shortest_path.contains(&(maze_x as i32, maze_y as i32 - 1))
         {
             if laby_with_walls[draw_y + 1][draw_x] == WALL_CHAR {
@@ -377,7 +384,10 @@ impl MazeScene {
         }
 
         // West
-        if !cell.has_wall_west() && maze_x > 0 && shortest_path.contains(&(maze_x as i32 - 1, maze_y as i32)) {
+        if !cell.has_wall_west()
+            && maze_x > 0
+            && shortest_path.contains(&(maze_x as i32 - 1, maze_y as i32))
+        {
             if laby_with_walls[draw_y][draw_x - 1] == WALL_CHAR {
                 laby_with_walls[draw_y][draw_x - 1] = PATH_CHAR;
                 laby_with_walls_values[draw_y][draw_x - 1] = base_value;
@@ -386,7 +396,7 @@ impl MazeScene {
 
         // East
         if !cell.has_wall_east()
-            && maze_x + 1 < self.maze.width
+            && maze_x + 1 < maze_width
             && shortest_path.contains(&(maze_x as i32 + 1, maze_y as i32))
         {
             if laby_with_walls[draw_y][draw_x + 1] == WALL_CHAR {
@@ -398,6 +408,8 @@ impl MazeScene {
 
     fn choose_color(
         &mut self,
+        maze_width: &usize,
+        maze_height: &usize,
         ch: char,
         value: i32,
         random_colored: bool,
@@ -423,7 +435,7 @@ impl MazeScene {
             }
 
             // Return a color from gradient, percentage is cell value / maze size
-            let percentage = value as f32 / (self.maze.width * self.maze.height) as f32 * 100.0;
+            let percentage = value as f32 / (maze_width * maze_height) as f32 * 100.0;
             let gradient_colors = self.create_gradient((0, 126, 126), 100);
             return Color::AnsiValue(self.get_color_from_percentage(&gradient_colors, percentage));
         }
@@ -434,6 +446,27 @@ impl MazeScene {
             GOAL_CHAR => GOAL_COLOR,
             _ => self.color_path,
         }
+    }
+
+    pub fn get_color_for_cell(&mut self, v: u32) -> Color {
+        if v == 0 {
+            return self.color_path;
+        }
+        // Check if the color is already cached
+        if let Some(color) = self.cache.get(&v) {
+            return Color::AnsiValue(*color);
+        }
+
+        let r = random::<u8>();
+        let g = random::<u8>();
+        let b = random::<u8>();
+
+        let color = Color::Rgb { r, g, b };
+
+        // Cache the color
+        self.cache.insert(v, self.rgb_to_ansi(r, g, b));
+
+        color
     }
 
     /// Converts an RGB color to an ANSI 256 color code.
@@ -466,34 +499,11 @@ impl MazeScene {
         let index = ((percentage / 100.0).powf(2.0) * (gradient_colors.len() - 1) as f32) as usize;
         gradient_colors[index]
     }
-
-    // /// Generates a color based on cell value.
-    // fn get_color_for_cell(&mut self, v: u32) -> Color {
-    //     if v == 0 {
-    //         return self.color_path;
-    //     }
-    //     // Check if the color is already cached
-    //     if let Some(color) = self.cache.get(&v) {
-    //         return Color::AnsiValue(*color);
-    //     }
-
-    //     let r = random::<u8>();
-    //     let g = random::<u8>();
-    //     let b = random::<u8>();
-
-    //     let color = Color::Rgb { r, g, b };
-
-    //     // Cache the color
-    //     self.cache.insert(v, self.rgb_to_ansi(r, g, b));
-
-    //     color
-    // }
 }
 
 impl Clone for MazeScene {
     fn clone(&self) -> MazeScene {
         MazeScene {
-            maze: self.maze.clone(),
             x: self.x,
             y: self.y,
             cell_size: self.cell_size,
@@ -501,7 +511,9 @@ impl Clone for MazeScene {
             color_path: self.color_path,
             color_visited: self.color_visited,
             context: self.context.clone(),
-            cache: self.cache.clone()
+            cache: self.cache.clone(),
+            buffer: self.buffer.clone(),
+            last_frame: self.last_frame.clone(),
         }
     }
 }

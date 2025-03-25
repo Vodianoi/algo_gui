@@ -21,7 +21,7 @@ pub const PATH_CHAR: char = ' ';
 pub const GOAL_CHAR: char = 'G';
 pub const START_CHAR: char = 'S';
 
-#[derive(Clone)]
+#[derive(Clone,PartialEq)]
 pub struct Maze {
     pub width: usize,
     pub height: usize,
@@ -251,7 +251,7 @@ impl Debug for Maze {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone,PartialEq)]
 pub struct Cell {
     pub walls: [bool; 4],
     pub visited: bool,
@@ -388,7 +388,6 @@ pub struct Runner<T: Clone + 'static, C: 'static> {
     scene: SharedScene<T, C>,
     pub running: Arc<AtomicBool>,
     data: T, // Store the data here
-    cache: HashMap<u32, u8>,
 }
 
 impl<T: Clone, C> Runner<T, C>
@@ -403,7 +402,6 @@ where
             scene: SharedScene::new(scene),
             running: Arc::new(AtomicBool::new(true)),
             data,
-            cache: HashMap::new(),
         }
     }
 
@@ -450,7 +448,7 @@ pub trait VisualizationContext: Send + Sync {
 //     }
 // }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct MazeContext {
     pub path: Vec<(i32, i32)>,
     pub settings: MazeSettings,
@@ -487,7 +485,7 @@ impl VisualizationContext for SortingContext {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct MazeSettings {
     pub colored: bool,
     pub show_values: bool,
