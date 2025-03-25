@@ -5,22 +5,31 @@ use std::{
     },
     thread,
     time::Duration,
+    vec,
 };
 
-use crate::{data::data_structures::Maze, scenes::maze_scene::MazeScene};
+use crate::data::{
+    self,
+    data_structures::{Maze, MazeContext, MazeSettings, Scene},
+};
 
-use super::maze_generation::Algorithm;
+use data::data_structures::Runnable;
 use std::collections::VecDeque;
+
+pub const COLORED: bool = crate::algorithms::maze_generation::COLORED;
 
 #[derive(Clone)]
 pub struct BFS;
 
-impl Algorithm for BFS {
-    fn run(&self, scene: Arc<Mutex<MazeScene>>, running: Arc<AtomicBool>) {
-        let mut maze = scene.lock().unwrap().maze.clone();
+impl Runnable<Maze, MazeContext> for BFS {
+    fn run(
+        &self,
+        maze: &mut Maze,
+        scene: Arc<Mutex<dyn Scene<Maze, MazeContext>>>,
+        running: Arc<AtomicBool>,
+    ) {
         maze.clear_path();
         maze.clear_values();
-        scene.lock().unwrap().maze = maze.clone();
         let start = maze.start;
         let goal = maze.goal;
         let width = maze.width;
@@ -48,9 +57,13 @@ impl Algorithm for BFS {
                 cell.visited = true;
                 cell.value = value;
                 value += 1;
-                scene.lock().unwrap().maze = maze.clone();
+                let context = MazeContext {
+                    path: vec![(x as i32, y as i32)],
+                    settings: Self::SETTINGS,
+                };
+                update_maze(&scene, maze, &context);
             }
-            thread::sleep(Duration::from_millis(10)); // Adjust visualization speed
+            // thread::sleep(Duration::from_millis(10)); // Adjust visualization speed
 
             // If we reach the end, stop the search
             if (x, y) == goal {
@@ -70,30 +83,48 @@ impl Algorithm for BFS {
             }
         }
         // Final update to visualize the completed path
-        scene.lock().unwrap().maze = maze.clone();
+        let context = MazeContext {
+            path: vec![],
+            settings: Self::SETTINGS,
+        };
+        update_maze(&scene, maze, &context);
         thread::sleep(Duration::from_secs(2));
-        self.find_shortest_path(&mut maze, scene);
+        self.find_shortest_path(maze, scene);
     }
 
     fn as_any(&self) -> &dyn std::any::Any {
         self
     }
 
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
-        self
+    fn clone_box(&self) -> Box<dyn Runnable<Maze, MazeContext>> {
+        Box::new(self.clone())
     }
 }
 
 impl BFS {
-    pub fn find_shortest_path(&self, maze: &mut Maze, scene: Arc<Mutex<MazeScene>>) {
+    pub const SETTINGS: MazeSettings = MazeSettings {
+        bfs: true,
+        colored: COLORED,
+        random_colors: false,
+        show_values: true,
+    };
+    pub fn find_shortest_path(
+        &self,
+        maze: &mut Maze,
+        scene: Arc<Mutex<dyn Scene<Maze, MazeContext>>>,
+    ) {
         maze.clear_path();
-        scene.lock().unwrap().maze = maze.clone();
+        let context = MazeContext {
+            path: vec![],
+            settings: Self::SETTINGS,
+        };
+        update_maze(&scene, maze, &context);
         let width = maze.width;
         let height = maze.height;
         let goal = maze.goal;
         let goal = (goal.0 as usize, goal.1 as usize);
         let mut value = maze.get_cell(goal.0 as i32, goal.1 as i32).value;
-        let mut path = vec![(goal.0, goal.1)];
+        let mut path = vec![(goal.0 as i32, goal.1 as i32)];
         while value > 0 {
             let (x, y) = path.last().unwrap();
             let neighbors = maze.get_valid_neighbors(*x as i32, *y as i32);
@@ -119,16 +150,21 @@ impl BFS {
                 if nx < width && ny < height {
                     let cell = maze.get_cell(nx as i32, ny as i32);
                     if cell.value == min {
-                        path.push((nx, ny));
+                        path.push((nx as i32, ny as i32));
                         value = min;
 
                         // Update the maze and scene for visualization
                         let cell = maze.get_cell_mut(nx as i32, ny as i32);
                         cell.visited = true;
                         // cell.value = -2;
-                        scene.lock().unwrap().shortest_path = path.clone();
-                        scene.lock().unwrap().maze = maze.clone();
-                        thread::sleep(Duration::from_millis(50)); // Adjust visualization speed
+
+                        let context = MazeContext {
+                            path: path.clone(),
+                            settings: Self::SETTINGS,
+                        };
+                        update_maze(&scene, maze, &context);
+
+                        // thread::sleep(Duration::from_millis(50)); // Adjust visualization speed
 
                         break;
                     }
@@ -140,19 +176,36 @@ impl BFS {
         for &(x, y) in &path {
             maze.get_cell_mut(x as i32, y as i32).visited = true;
         }
-        scene.lock().unwrap().shortest_path = path.clone();
-        scene.lock().unwrap().maze = maze.clone();
+
+        let context = MazeContext {
+            path: path.clone(),
+            settings: Self::SETTINGS,
+        };
+        update_maze(&scene, maze, &context);
     }
 }
 
 #[derive(Clone)]
 pub struct DFS;
 
+impl DFS {
+    pub const SETTINGS: MazeSettings = MazeSettings {
+        bfs: false,
+        colored: COLORED,
+        random_colors: false,
+        show_values: false,
+    };
+}
+
 // Depth-first search algorithm
 // maze is a grid of cells, each cell has a set of walls (n,s,w, e) that can be removed by setting the value to false
-impl Algorithm for DFS {
-    fn run(&self, scene: Arc<Mutex<MazeScene>>, running: Arc<AtomicBool>) {
-        let mut maze = scene.lock().unwrap().maze.clone();
+impl Runnable<Maze, MazeContext> for DFS {
+    fn run(
+        &self,
+        maze: &mut Maze,
+        scene: Arc<Mutex<dyn Scene<Maze, MazeContext>>>,
+        running: Arc<AtomicBool>,
+    ) {
         let start = maze.start;
         let goal = maze.goal;
         let width = maze.width;
@@ -166,7 +219,11 @@ impl Algorithm for DFS {
             let (x, y) = stack.pop().unwrap();
             {
                 maze.get_cell_mut(x as i32, y as i32).visited = true;
-                scene.lock().unwrap().maze = maze.clone();
+                let context = MazeContext {
+                    path: vec![(x as i32, y as i32)],
+                    settings: Self::SETTINGS,
+                };
+                update_maze(&scene, maze, &context);
             }
             thread::sleep(Duration::from_millis(10)); // Adjust visualization speed
                                                       // If we reach the end, stop the search
@@ -189,14 +246,26 @@ impl Algorithm for DFS {
         // Final update to visualize the completed path
         thread::sleep(Duration::from_secs(2));
         maze.clear_path();
-        scene.lock().unwrap().maze = maze.clone();
+        let context = MazeContext {
+            path: vec![],
+            settings: Self::SETTINGS,
+        };
+        update_maze(&scene, maze, &context);
     }
 
     fn as_any(&self) -> &dyn std::any::Any {
         self
     }
 
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
-        self
+    fn clone_box(&self) -> Box<dyn Runnable<Maze, MazeContext>> {
+        Box::new(self.clone())
     }
+}
+
+fn update_maze(
+    scene: &Arc<Mutex<dyn Scene<Maze, MazeContext>>>,
+    maze: &Maze,
+    context: &MazeContext,
+) {
+    scene.lock().unwrap().update(maze, context);
 }

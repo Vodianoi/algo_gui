@@ -4,6 +4,8 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use crate::data::data_structures::{Scene, SortingContext};
+
 pub struct SortScene {
     pub data: Arc<Mutex<Vec<i32>>>,
     pub x: i32,
@@ -16,6 +18,20 @@ pub struct SortScene {
     last_frame: Option<Vec<i32>>,
     last_highlighted: Vec<usize>,
     last_highlight_color: Color,
+}
+
+impl Scene<Vec<i32>, SortingContext> for SortScene {
+    fn render(&mut self, engine: &mut ConsoleEngine) {
+        self.draw(engine);
+    }
+
+    fn update(&mut self, data: &Vec<i32>, context: &SortingContext) {
+        self.update(data.clone(), &context.highlights, context.color);
+    }
+    
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
 }
 
 impl SortScene {
@@ -63,7 +79,10 @@ impl SortScene {
             self.last_frame = Some(frame.clone());
             let highlight_indices = self.hightlight_buffer.pop_front().unwrap_or_default();
             let highlight_indices = highlight_indices.as_slice();
-            let highlight_color = self.highlight_color_buffer.pop_front().unwrap_or(Color::Red);
+            let highlight_color = self
+                .highlight_color_buffer
+                .pop_front()
+                .unwrap_or(Color::Red);
             self.draw_frame(
                 engine,
                 &frame,

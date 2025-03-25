@@ -1,12 +1,6 @@
 // Menu struct to create a menu with options (buttons)
-
-use std::borrow::Borrow;
-
 use crate::menu::alignment::Alignment;
-use crate::menu::button::Button;
-use crate::menu::dropdown::Dropdown;
-use crate::menu::menu_item::MenuItem;
-use crate::menu::text::Text;
+use crate::menu::{items::{button::Button, dropdown::Dropdown, text::Text}, menu_item::MenuItem};
 use console_engine::ConsoleEngine;
 
 pub struct Menu {
@@ -55,20 +49,28 @@ impl Menu {
             self.height
         };
 
-        let x_positions: Vec<i32> = self
+        // Calculate the maximum content width for consistent alignment
+        let max_content_width = self
             .items
             .iter()
             .map(|item| {
                 if let Some(button) = item.as_any().downcast_ref::<Button>() {
-                    self.calculate_x_position(&button.label)
+                    button.label.len() as i32
                 } else if let Some(dropdown) = item.as_any().downcast_ref::<Dropdown>() {
-                    self.calculate_x_position(&dropdown.options[dropdown.selected_index])
+                    dropdown.options[dropdown.selected_index].len() as i32
                 } else if let Some(text) = item.as_any().downcast_ref::<Text>() {
-                    self.calculate_x_position(&text.content)
+                    text.content.len() as i32
                 } else {
-                    self.x // Default position if item type is unknown
+                    0
                 }
             })
+            .max()
+            .unwrap_or(0);
+
+        let x_positions: Vec<i32> = self
+            .items
+            .iter()
+            .map(|_item| self.calculate_x_position(max_content_width))
             .collect();
 
         for (i, item) in self.items.iter_mut().enumerate() {
@@ -96,39 +98,68 @@ impl Menu {
     }
 
     fn draw_border(&self, engine: &mut ConsoleEngine) {
-        for x in self.x..self.x + self.width {
-            engine.print(x, self.y, "─");
-            engine.print(x, self.y + self.height, "─");
-        }
-        for y in self.y..self.y + self.height {
-            engine.print(self.x, y, "│");
-            engine.print(self.x + self.width, y, "│");
-        }
-        engine.print(self.x, self.y, "┌");
-        engine.print(self.x + self.width, self.y, "┐");
-        engine.print(self.x, self.y + self.height, "└");
-        engine.print(self.x + self.width, self.y + self.height, "┘");
-
-        for i in 1..self.height {
-            engine.print(self.x + self.width, self.y + i, "│");
-        }
+        engine.rect_border(
+            self.x,
+            self.y,
+            self.x + self.width,
+            self.y + self.height,
+            console_engine::rect_style::BorderStyle::new_solid(),
+        );
     }
 
-    fn calculate_x_position(&self, content: &str) -> i32 {
+    fn calculate_x_position(&self, max_content_width: i32) -> i32 {
         match self.alignment {
             Alignment::Left => self.x,
-            Alignment::Center => self.x + (self.width - content.len() as i32) / 2,
-            Alignment::Right => self.x + self.width - content.len() as i32,
+            Alignment::Center => self.x + (self.width - max_content_width) / 2,
+            Alignment::Right => self.x + self.width - max_content_width,
         }
     }
 
-    pub fn get_selected(&self) -> usize {
-        self.selected_index
+    fn mouse_pressed(&mut self, engine: &mut ConsoleEngine) {
+        let mouse_coords = engine.get_mouse_press(console_engine::MouseButton::Left);
+        let mouse_x = match mouse_coords {
+            Some((x, _)) => x as i32,
+            None => return,
+        };
+        let mouse_y = match mouse_coords {
+            Some((_, y)) => y as i32,
+            None => return,
+        };
+
+        for (i, item) in self.items.iter_mut().enumerate() {
+            if let Some(button) = item.as_any_mut().downcast_mut::<Button>() {
+                if button.is_mouse_over(mouse_x, mouse_y) {
+                    if self.selected_index == i && button.selected {
+                        self.confirmed = true; // Confirm on double click
+                        button.handle_input(engine);
+                        print!("Mouse double-clicked on button: {}", button.label);
+                    } else {
+                        self.selected_index = i;
+                        button.selected = true;
+                    }
+                }
+            } else if let Some(dropdown) = item.as_any_mut().downcast_mut::<Dropdown>() {
+                if dropdown.is_mouse_over(mouse_x, mouse_y) {
+                    if self.selected_index == i && dropdown.selected {
+                        self.confirmed = true; // Confirm on double click
+                        dropdown.handle_input(engine);
+                        print!("Mouse double-clicked on dropdown: {}", dropdown.options[dropdown.selected_index]);
+                    } else {
+                        self.selected_index = i;
+                        dropdown.selected = true;
+                    }
+                }
+            }
+        }
     }
 
-    fn should_quit(&self) -> bool {
-        self._quit
-    }
+    // pub fn get_selected(&self) -> usize {
+    //     self.selected_index
+    // }
+
+    // fn should_quit(&self) -> bool {
+    //     self._quit
+    // }
 
     pub fn handle_key_event(&mut self, engine: &mut console_engine::ConsoleEngine) {
         if engine.is_key_pressed(console_engine::KeyCode::Char('q')) {
@@ -136,6 +167,7 @@ impl Menu {
         }
     }
     pub fn handle_input(&mut self, engine: &mut ConsoleEngine) {
+        self.mouse_pressed(engine);
         let is_dropdown_open: bool = self.items.iter().any(|item| {
             if let Some(dropdown) = item.as_any().downcast_ref::<Dropdown>() {
                 return dropdown.is_open;
@@ -171,6 +203,7 @@ impl Menu {
                 self.next_selectable();
             }
         }
+
     }
 
     fn next_selectable(&mut self) {

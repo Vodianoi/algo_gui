@@ -1,9 +1,11 @@
 use crate::menu::{
-    alignment::Alignment, button::Button, maze_menu::run_maze_menu, menu::Menu,
-    pathfinding_menu::run_pathfinding_menu, sort_menu::run_sort_menu, text::Text,
+    alignment::Alignment, menu::Menu,
+    items::{button::Button, text::Text},
 };
-use console_engine::{ConsoleEngine, KeyCode, KeyModifiers};
+use console_engine::{ConsoleEngine, KeyCode};
 use termsize;
+
+use super::{maze_menu::run_maze_menu, sort_menu::run_sort_menu};
 
 pub fn main_menu() {
     // Get terminal size to dynamically adjust screen width and height
@@ -12,7 +14,7 @@ pub fn main_menu() {
     let screen_height = rows as u32;
 
     // Initialize the console engine with the full terminal size and 60 FPS
-    let mut engine = ConsoleEngine::init(screen_width, screen_height, 30).unwrap();
+    let mut engine = ConsoleEngine::init(screen_width, screen_height, 60).unwrap();
 
     // Define the main menu options using the new Button structure
     let menu_items: Vec<Box<dyn crate::menu::menu_item::MenuItem>> = vec![
@@ -25,7 +27,7 @@ pub fn main_menu() {
     // Create a new Menu instance with centered alignment
     let menu_width = screen_width as i32 / 4;
     let menu_height = screen_height as i32 - 2;
-    let mut menu = Menu::new(0, 0, menu_width, menu_height, menu_items, Alignment::Left);
+    let mut menu = Menu::new(0, 0, menu_width, menu_height, menu_items, Alignment::Center);
 
     // Initialize the menu handler
 

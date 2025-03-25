@@ -1,12 +1,10 @@
 use console_engine::pixel;
 use console_engine::Color;
 use console_engine::ConsoleEngine;
-use console_engine::KeyCode;
 
-use text_to_ascii_art::Alignment;
-use text_to_ascii_art::{align, fonts, to_art};
+use text_to_ascii_art::to_art;
 
-use super::menu_item::MenuItem;
+use crate::menu::menu_item::MenuItem;
 
 pub struct Button {
     pub x: i32,
@@ -42,6 +40,8 @@ impl Button {
             );
         }
     }
+
+
 }
 
 impl MenuItem for Button {
@@ -66,7 +66,7 @@ impl MenuItem for Button {
     fn draw_ascii(&self, engine: &mut ConsoleEngine) {
         // Draw the label centered and styled
         let label_art = to_art(self.label.to_string(), "", 0, 0, 0); // Result<String, String>
-        let label_x = self.x + (self.width - self.label.len() as i32) / 2;
+        let label_x = self.x + (self.width - self.label.len() as i32);
         let label_y = self.y + self.height / 2;
         let art = label_art.unwrap();
 
@@ -74,7 +74,7 @@ impl MenuItem for Button {
             // if selected
             if self.selected {
                 engine.print_fbg(
-                    label_x,
+                    label_x / 3,
                     label_y + i as i32,
                     line,
                     Color::Yellow,
@@ -82,7 +82,7 @@ impl MenuItem for Button {
                 );
             } else {
                 engine.print_fbg(
-                    label_x,
+                    label_x / 3,
                     label_y + i as i32,
                     line,
                     Color::White,
@@ -115,6 +115,7 @@ impl MenuItem for Button {
     }
 
     fn handle_input(&mut self, engine: &mut ConsoleEngine) -> bool {
+        let _ = engine;
         // Button-specific input handling if necessary
         false
     }
@@ -129,6 +130,9 @@ impl MenuItem for Button {
 
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
         self
+    }
+    fn is_mouse_over(&self, x: i32, y: i32) -> bool {
+        x >= self.x && x <= self.x + self.width && y >= self.y && y <= self.y + self.height
     }
 }
 

@@ -1,17 +1,27 @@
-// Maze data structure
-use rand::{random, Rng};
 use std::{
+    any::Any,
+    collections::HashMap,
     fmt::{Debug, Display, Formatter, Result},
     io::Write,
+    sync::{
+        atomic::{AtomicBool, AtomicUsize, Ordering},
+        Arc, Mutex,
+    },
+    thread,
 };
+
+use console_engine::{Color, ConsoleEngine};
+use rand::{random, Rng};
+
 
 pub const EMPTY_CHAR: char = ' ';
 pub const WALL_CHAR: char = '#';
 pub const PATH_CHAR: char = ' ';
-pub const VISITED_CHAR: char = '.';
+// pub const VISITED_CHAR: char = '.';
 pub const GOAL_CHAR: char = 'G';
 pub const START_CHAR: char = 'S';
 
+#[derive(Clone)]
 pub struct Maze {
     pub width: usize,
     pub height: usize,
@@ -36,11 +46,6 @@ impl Maze {
 
         let start = (random::<usize>() % width as usize, random::<usize>() % height as usize);
         let goal =  (random::<usize>() % width as usize, random::<usize>() % height as usize);
-
-
-
-
-
 
         Maze {
             width,
@@ -246,6 +251,7 @@ impl Debug for Maze {
     }
 }
 
+#[derive(Clone)]
 pub struct Cell {
     pub walls: [bool; 4],
     pub visited: bool,
@@ -311,45 +317,180 @@ impl Cell {
     }
 }
 
-pub struct Graph {
-    vertices: Vec<i32>,
-    edges: Vec<(i32, i32)>,
+// Common trait for tasks that can be run by the Runner
+pub trait Runnable<T: Send + Sync, C: VisualizationContext>: Send + Sync {
+    fn run(&self, data: &mut T, scene: Arc<Mutex<dyn Scene<T, C>>>, running: Arc<AtomicBool>);
+    fn as_any(&self) -> &dyn Any;
+    fn clone_box(&self) -> Box<dyn Runnable<T, C>>;
 }
 
-impl Graph {
-    pub fn new(maze: &Maze) -> Graph {
-        let mut graph = Graph {
-            vertices: Vec::new(),
-            edges: Vec::new(),
-        };
-        for y in 0..maze.height {
-            for x in 0..maze.width {
-                let cell = maze.get_cell(x as i32, y as i32);
-                graph.add_vertex(cell.value);
-                let neighbors = maze.get_neighbors(x as i32, y as i32);
-                for neighbor in neighbors {
-                    graph.add_edge(cell.value, maze.get_cell(neighbor.0, neighbor.1).value);
+impl<T: Send + Sync, F, C: VisualizationContext> Runnable<T, C> for F
+where
+    F: 'static + Send + Sync + Clone + Fn(&mut T, Arc<Mutex<dyn Scene<T,C>>>, Arc<AtomicBool>),
+{
+    fn run(&self, data: &mut T, scene: Arc<Mutex<dyn Scene<T, C>>>, running: Arc<AtomicBool>) {
+        self(data, scene, running);
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn clone_box(&self) -> Box<dyn Runnable<T, C>> {
+        Box::new(self.clone())
+    }
+}
+
+impl<T: Send + Sync,C: VisualizationContext> Clone for Box<dyn Runnable<T, C>> {
+    fn clone(&self) -> Box<dyn Runnable<T, C>> {
+        self.clone_box()
+    }
+}
+
+// Common trait for scenes (MazeScene, SortScene, etc.)
+pub trait Scene<T, C>: Send + Sync + Any {
+    fn render(&mut self, engine: &mut ConsoleEngine);
+    fn update(&mut self, data: &T, context: &C);
+    fn as_any(&self) -> &dyn Any;
+}
+
+// Shared wrapper for scenes
+pub struct SharedScene<T: 'static, C: 'static>(Arc<Mutex<dyn Scene<T, C>>>);
+
+impl<T: 'static, C: 'static> SharedScene<T, C> {
+    pub fn new(scene: Arc<Mutex<dyn Scene<T, C>>>) -> Self {
+        Self(scene)
+    }
+
+    pub fn render(&self, engine: &mut ConsoleEngine)
+    where
+        T: 'static,
+        C: 'static,
+    {
+        self.0.lock().unwrap().render(engine);
+    }
+
+    pub fn update(&self, data: &T, context: &C) {
+        self.0.lock().unwrap().update(data, context);
+    }
+}
+
+impl<T, C> Clone for SharedScene<T, C> {
+    fn clone(&self) -> Self {
+        Self(Arc::clone(&self.0))
+    }
+}
+
+// Generic Runner for both sorting and algorithms
+pub struct Runner<T: Clone + 'static, C: 'static> {
+    tasks: Vec<Box<dyn Runnable<T, C>>>,
+    current_task: Arc<AtomicUsize>,
+    scene: SharedScene<T, C>,
+    pub running: Arc<AtomicBool>,
+    data: T, // Store the data here
+    cache: HashMap<u32, u8>,
+}
+
+impl<T: Clone, C> Runner<T, C>
+where
+    T: 'static + Send + Sync,
+    C: 'static + VisualizationContext,
+{
+    pub fn new(tasks: Vec<Box<dyn Runnable<T, C>>>, scene: Arc<Mutex<dyn Scene<T, C>>>, data: T) -> Self {
+        Runner {
+            tasks,
+            current_task: Arc::new(AtomicUsize::new(0)),
+            scene: SharedScene::new(scene),
+            running: Arc::new(AtomicBool::new(true)),
+            data,
+            cache: HashMap::new(),
+        }
+    }
+
+    pub fn start(&mut self) {
+        let scene_clone = self.scene.clone();
+        let running_clone = Arc::clone(&self.running);
+        let tasks = self.tasks.clone();
+        let current_task_clone = Arc::clone(&self.current_task);
+        let mut data = self.data.clone();
+
+        thread::spawn(move || {
+            current_task_clone.store(0, Ordering::Relaxed);
+            let _task_length = tasks.len();
+
+            for (index, task) in tasks.into_iter().enumerate() {
+                current_task_clone.store(index, Ordering::Relaxed);
+
+                if running_clone.load(Ordering::SeqCst) {
+                    task.run(&mut data, scene_clone.0.clone(), running_clone.clone());
+                } else {
+                    break;
                 }
             }
+        });
+    }
+
+    pub fn stop(&self) {
+        self.running.store(false, Ordering::SeqCst);
+    }
+
+    pub fn render(&mut self, engine: &mut ConsoleEngine) {
+        self.scene.render(engine);
+    }
+}
+
+
+pub trait VisualizationContext: Send + Sync {
+    fn as_any(&self) -> &dyn Any;
+}
+
+// impl<T: 'static + Send + Sync> VisualizationContext for T {
+//     fn as_any(&self) -> &dyn Any {
+//         self
+//     }
+// }
+
+#[derive(Clone)]
+pub struct MazeContext {
+    pub path: Vec<(i32, i32)>,
+    pub settings: MazeSettings,
+}
+impl MazeContext {
+    pub(crate) fn default() -> MazeContext {
+        MazeContext {
+            path: Vec::new(),
+            settings: MazeSettings {
+                colored: false,
+                show_values: false,
+                random_colors: false,
+                bfs: false,
+            },
         }
-        graph
     }
-    pub fn add_vertex(&mut self, value: i32) {
-        self.vertices.push(value);
+}
+
+impl VisualizationContext for MazeContext {
+    fn as_any(&self) -> &dyn Any {
+        self
     }
-    pub fn add_edge(&mut self, from: i32, to: i32) {
-        self.edges.push((from, to));
+}
+
+#[derive(Clone)]
+pub struct SortingContext {
+    pub highlights: Vec<usize>,
+    pub color: Color,
+}
+
+impl VisualizationContext for SortingContext {
+    fn as_any(&self) -> &dyn Any {
+        self
     }
-    pub fn get_neighbors(&self, vertex: i32) -> Vec<i32> {
-        let mut neighbors = Vec::new();
-        for (from, to) in &self.edges {
-            if *from == vertex {
-                neighbors.push(*to);
-            }
-        }
-        neighbors
-    }
-    pub fn get_vertices(&self) -> Vec<i32> {
-        self.vertices.clone()
-    }
+}
+
+#[derive(Clone)]
+pub struct MazeSettings {
+    pub colored: bool,
+    pub show_values: bool,
+    pub random_colors: bool,
+    pub bfs: bool,
 }

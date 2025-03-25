@@ -1,8 +1,12 @@
+use std::sync::Arc;
+
 use crate::algorithms::sorting::*;
+use crate::data::data_structures::{Runnable, Runner, SortingContext};
 use crate::menu::{
-    alignment::Alignment, button::Button, dropdown::Dropdown, menu::Menu, menu_item::MenuItem,
+    alignment::Alignment, items::button::Button, items::dropdown::Dropdown, menu::Menu, menu_item::MenuItem,
 };
 use crate::scenes::sort_scene::SortScene;
+use std::sync::Mutex;
 use console_engine::ConsoleEngine;
 
 pub fn run_sort_menu(engine: &mut ConsoleEngine) {
@@ -13,7 +17,7 @@ pub fn run_sort_menu(engine: &mut ConsoleEngine) {
     let menu_items: Vec<Box<dyn MenuItem>> = vec![sort_dropdown, start_button];
     let (menu_width, menu_height, display_width, display_height, x, y) = calculate_dimensions(engine);
 
-    let mut sort_menu = Menu::new(0, 0, menu_width, menu_height, menu_items, Alignment::Left);
+    let mut sort_menu = Menu::new(0, 0, menu_width, menu_height, menu_items, Alignment::Center);
 
     main_loop(engine, &mut sort_menu, display_width as usize, display_height as usize, x, y);
 }
@@ -106,14 +110,13 @@ fn handle_sorting(
 
     let data = generate_dataset(display_width, display_height);
     let algorithm = get_sorting_algorithm(&selected_algorithm);
-
-    let scene = SortScene::new(data, 2, x, y);
-    let runner = SortingRunner::new(algorithm, scene);
+    let scene = Arc::new(Mutex::new(SortScene::new(data.clone(), x, y, 2)));
+    let mut runner = Runner::new(vec![algorithm], scene, data);
     let running = runner.running.clone();
 
     runner.start();
 
-    while running.get() {
+    while running.load(std::sync::atomic::Ordering::Relaxed) {
         engine.wait_frame();
         engine.clear_screen();
 
@@ -141,12 +144,15 @@ fn generate_dataset(display_width: usize, display_height: usize) -> Vec<i32> {
         .collect()
 }
 
-fn get_sorting_algorithm(name: &str) -> Box<dyn SortingAlgorithm> {
+fn get_sorting_algorithm(name: &str) -> Box<dyn Runnable<Vec<i32>, SortingContext>> {
     match name {
         "Bubble Sort" => Box::new(BubbleSort),
         "Selection Sort" => Box::new(SelectionSort),
         "Insertion Sort" => Box::new(InsertionSort),
         "Merge Sort" => Box::new(MergeSort),
+        "Quick Sort" => Box::new(QuickSort),
+        "Heap Sort" => Box::new(HeapSort),
+        "Shell Sort" => Box::new(ShellSort),
         _ => Box::new(BubbleSort),
     }
 }

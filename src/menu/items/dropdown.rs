@@ -16,6 +16,20 @@ pub struct Dropdown {
     pub is_open: bool,
     pub selected: bool,
 }
+impl Dropdown {
+    pub(crate) fn new(width: i32, options: Vec<String>, selected_index: i32, is_open: bool, selected: bool) -> Self {
+        
+        Dropdown {
+            x: 0,
+            y: 0,
+            width,
+            options,
+            selected_index: selected_index as usize,
+            is_open,
+            selected,
+        }
+    }
+}
 
 // Helper function to print ASCII art using console_engine and text_to_ascii_art
 pub fn print_ascii(
@@ -188,6 +202,13 @@ impl MenuItem for Dropdown {
             }
         }
         false
+    }
+
+    fn is_mouse_over(&self, x: i32, y: i32) -> bool {
+        x >= self.x
+            && x <= self.x + self.width
+            && y >= self.y
+            && y <= self.y + self.get_height()
     }
 
     fn is_selectable(&self) -> bool {

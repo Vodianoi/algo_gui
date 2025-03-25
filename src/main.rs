@@ -14,18 +14,25 @@ mod data {
 
 mod menu {
     pub mod alignment;
-    pub mod button;
-    pub mod dropdown;
-    pub mod dropdown_menu;
-    pub mod main_menu;
-    pub mod maze_menu;
     pub mod menu;
     pub mod menu_item;
-    pub mod pathfinding_menu;
-    pub mod sort_menu;
-    pub mod text;
     pub mod theme;
+
+    pub mod factories {
+        pub mod main_menu;
+        pub mod maze_menu;
+        pub mod sort_menu;
+        pub mod pathfinding_menu;
+    }
+
+    pub mod items {
+        pub mod button;
+        pub mod dropdown;
+        pub mod dropdown_menu;
+        pub mod text;
+    }
 }
+
 
 mod scenes {
     pub mod maze_scene;
@@ -43,5 +50,5 @@ mod tests {
 }
 
 fn main() {
-    menu::main_menu::main_menu();
+    menu::factories::main_menu::main_menu();
 }

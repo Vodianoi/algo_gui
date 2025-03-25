@@ -1,106 +1,45 @@
-use std::sync::{Arc, Mutex};
+use std::{
+    any::Any,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc, Mutex,
+    },
+};
 
-use console_engine::{Color, ConsoleEngine};
+use console_engine::Color;
 
-use crate::scenes::sort_scene::SortScene;
-
-pub trait SortingAlgorithm: Send + Sync {
-    fn sort(&self, scene: SharedSortScene, running: SharedBool);
-    fn clone_box(&self) -> Box<dyn SortingAlgorithm>;
-}
-
-impl<T> SortingAlgorithm for T
-where
-    T: 'static + Send + Sync + Clone + Fn(SharedSortScene, SharedBool),
-{
-    fn sort(&self, scene: SharedSortScene, running: SharedBool) {
-        self(scene, running);
-    }
-
-
-    fn clone_box(&self) -> Box<dyn SortingAlgorithm> {
-        Box::new(self.clone())
-    }
-}
-
-pub struct SortingRunner {
-    algorithm: Box<dyn SortingAlgorithm>,
-    scene: SharedSortScene,
-    pub running: SharedBool,
-}
-
-impl SortingRunner {
-    pub fn new(algorithm: Box<dyn SortingAlgorithm>, scene: SortScene) -> Self {
-        Self {
-            algorithm,
-            scene: SharedSortScene::new(scene),
-            running: SharedBool::new(true),
-        }
-    }
-
-    pub fn start(&self) {
-        let scene = self.scene.clone();
-        let running = self.running.clone();
-        let algorithm = self.algorithm.clone_box();
-
-        // Start the sorting thread
-        algorithm.sort(scene, running);
-
-        // After sorting, make a last loop on all data to highlight it
-        let data = self.scene.0.lock().unwrap().buffer.back().unwrap().clone();
-        for i in 0..data.len() {
-                // Highlight from 0 to i
-                let highlight = (0..=i).collect();
-                let highlight_color = Color::Green;
-
-                self.scene.update(data.clone(), highlight, highlight_color);
-            
-        }
-    }
-
-    pub fn stop(&self) {
-        self.running.set(false);
-    }
-
-    pub fn render(&self, engine: &mut ConsoleEngine) {
-        self.scene.render(engine);
-    }
-}
-
-impl Clone for SortingRunner {
-    fn clone(&self) -> Self {
-        Self {
-            algorithm: self.algorithm.clone_box(),
-            scene: self.scene.clone(),
-            running: self.running.clone(),
-        }
-    }
-}
+use crate::data::data_structures::{Runnable, Scene, SortingContext};
 
 #[derive(Clone)]
 pub struct BubbleSort;
 
-impl SortingAlgorithm for BubbleSort {
-    fn sort(&self, scene: SharedSortScene, running: SharedBool) {
-        let mut data = scene.get_data();
+impl Runnable<Vec<i32>, SortingContext> for BubbleSort {
+    fn run(&self, data: &mut Vec<i32>, scene: Arc<Mutex<dyn Scene<Vec<i32>, SortingContext>>>, running: Arc<AtomicBool>) {
         for i in 0..data.len() {
             for j in 0..data.len() - i - 1 {
-                if !running.get() {
-                    return; // Stop sorting if the `running` flag is set to false
+                if !running.load(Ordering::SeqCst) {
+                    return; // Stop if the running flag is false
                 }
 
                 if data[j] > data[j + 1] {
                     data.swap(j, j + 1);
                 }
 
-                // Update the scene data for visualization
-                let highlight = vec![j, j + 1];
-                scene.update(data.clone(), highlight, Color::Red);
+                // Update the scene for visualization
+                let context = SortingContext {
+                    highlights: vec![j, j + 1],
+                    color: Color::Red,
+                };
+                scene.lock().unwrap().update(data, &context);
             }
         }
     }
 
-    fn clone_box(&self) -> Box<dyn SortingAlgorithm> {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn clone_box(&self) -> Box<dyn Runnable<Vec<i32>, SortingContext>> {
         Box::new(self.clone())
     }
 }
@@ -108,13 +47,12 @@ impl SortingAlgorithm for BubbleSort {
 #[derive(Clone)]
 pub struct SelectionSort;
 
-impl SortingAlgorithm for SelectionSort {
-    fn sort(&self, scene: SharedSortScene, running: SharedBool) {
-        let mut data = scene.get_data();
+impl Runnable<Vec<i32>, SortingContext> for SelectionSort {
+    fn run(&self, data: &mut Vec<i32>, scene: Arc<Mutex<dyn Scene<Vec<i32>, SortingContext>>>, running: Arc<AtomicBool>) {
         for i in 0..data.len() {
             let mut min_index = i;
             for j in i + 1..data.len() {
-                if !running.get() {
+                if !running.load(Ordering::SeqCst) {
                     return; // Stop sorting if the `running` flag is set to false
                 }
 
@@ -125,44 +63,56 @@ impl SortingAlgorithm for SelectionSort {
 
             data.swap(i, min_index);
 
-            // Update the scene data for visualization
-            let highlight = vec![i, min_index];
-            scene.update(data.clone(), highlight, Color::Red);
+            // Update the scene for visualization
+            let context = SortingContext {
+                highlights: vec![i, min_index],
+                color: Color::Red,
+            };
+            scene.lock().unwrap().update(data, &context);
         }
     }
 
-    fn clone_box(&self) -> Box<dyn SortingAlgorithm> {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn clone_box(&self) -> Box<dyn Runnable<Vec<i32>, SortingContext>> {
         Box::new(self.clone())
     }
 }
 
-
 #[derive(Clone)]
 pub struct InsertionSort;
 
-impl SortingAlgorithm for InsertionSort {
-    fn sort(&self, scene: SharedSortScene, running: SharedBool) {
-        let mut data = scene.get_data();
+impl Runnable<Vec<i32>, SortingContext> for InsertionSort {
+    fn run(&self, data: &mut Vec<i32>, scene: Arc<Mutex<dyn Scene<Vec<i32>, SortingContext>>>, running: Arc<AtomicBool>) {
         for i in 1..data.len() {
             let key = data[i];
             let mut j = i;
             while j > 0 && data[j - 1] > key {
-                if !running.get() {
+                if !running.load(Ordering::SeqCst) {
                     return; // Stop sorting if the `running` flag is set to false
                 }
 
                 data[j] = data[j - 1];
                 j -= 1;
 
-                // Update the scene data for visualization
-                let highlight = vec![j, j + 1];
-                scene.update(data.clone(), highlight, Color::Red);
+                // Update the scene for visualization
+                let context = SortingContext {
+                    highlights: vec![j, j + 1],
+                    color: Color::Red,
+                };
+                scene.lock().unwrap().update(data, &context);
             }
             data[j] = key;
         }
     }
 
-    fn clone_box(&self) -> Box<dyn SortingAlgorithm> {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn clone_box(&self) -> Box<dyn Runnable<Vec<i32>, SortingContext>> {
         Box::new(self.clone())
     }
 }
@@ -170,19 +120,20 @@ impl SortingAlgorithm for InsertionSort {
 #[derive(Clone)]
 pub struct MergeSort;
 
-impl SortingAlgorithm for MergeSort {
-    fn sort(&self, scene: SharedSortScene, running: SharedBool) {
-        let mut data = scene.get_data();
+impl Runnable<Vec<i32>, SortingContext> for MergeSort {
+    fn run(&self, data: &mut Vec<i32>, scene: Arc<Mutex<dyn Scene<Vec<i32>, SortingContext>>>, running: Arc<AtomicBool>) {
         let n = data.len();
         let mut temp = data.clone();
-        self.merge_sort(&mut data, &mut temp, 0, n - 1, &scene, &running);
+        self.merge_sort(data, &mut temp, 0, n - 1, &scene, &running);
     }
 
-    fn clone_box(&self) -> Box<dyn SortingAlgorithm> {
+    fn clone_box(&self) -> Box<dyn Runnable<Vec<i32>, SortingContext>> {
         Box::new(self.clone())
     }
 
-
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 }
 
 impl MergeSort {
@@ -192,8 +143,8 @@ impl MergeSort {
         temp: &mut Vec<i32>,
         left: usize,
         right: usize,
-        scene: &SharedSortScene,
-        running: &SharedBool,
+        scene: &Arc<Mutex<dyn Scene<Vec<i32>, SortingContext>>>,
+        running: &Arc<AtomicBool>,
     ) {
         if left >= right {
             return;
@@ -212,15 +163,15 @@ impl MergeSort {
         left: usize,
         mid: usize,
         right: usize,
-        scene: &SharedSortScene,
-        running: &SharedBool,
+        scene: &Arc<Mutex<dyn Scene<Vec<i32>, SortingContext>>>,
+        running: &Arc<AtomicBool>,
     ) {
         let mut i = left;
         let mut j = mid + 1;
         let mut k = left;
 
         while i <= mid && j <= right {
-            if !running.get() {
+            if !running.load(Ordering::SeqCst) {
                 return;
             }
 
@@ -250,57 +201,206 @@ impl MergeSort {
         for i in left..=right {
             data[i] = temp[i];
         }
-        
-        let highlight = (left..=right).collect();
-        scene.update(data.clone(), highlight, Color::Green);
+
+        // Update the scene for visualization
+        let context = SortingContext {
+            highlights: (left..=right).collect(),
+            color: Color::Green,
+        };
+        scene.lock().unwrap().update(data, &context);
     }
 }
 
-pub struct SharedSortScene(Arc<Mutex<SortScene>>);
+#[derive(Clone)]
+pub struct QuickSort;
 
-impl SharedSortScene {
-    pub fn new(scene: SortScene) -> Self {
-        Self(Arc::new(Mutex::new(scene)))
+impl Runnable<Vec<i32>, SortingContext> for QuickSort {
+    fn run(&self, data: &mut Vec<i32>, scene: Arc<Mutex<dyn Scene<Vec<i32>, SortingContext>>>, running: Arc<AtomicBool>) {
+        let high = data.len() as i32 - 1;
+        self.quick_sort(data, 0, high, &scene, &running);
     }
 
-    pub fn get_data(&self) -> Vec<i32> {
-        self.0.lock().unwrap().data.lock().unwrap().clone()
+    fn clone_box(&self) -> Box<dyn Runnable<Vec<i32>, SortingContext>> {
+        Box::new(self.clone())
     }
 
-    pub fn update(&self, data: Vec<i32>, highlight: Vec<usize>, highlight_color: Color) {
-        self.0.lock().unwrap().update(data, &highlight, highlight_color);
-    }
-
-    pub fn render(&self, engine: &mut ConsoleEngine) {
-        self.0.lock().unwrap().draw(engine);
+    fn as_any(&self) -> &dyn Any {
+        self
     }
 }
 
-impl Clone for SharedSortScene {
-    fn clone(&self) -> Self {
-        Self(Arc::clone(&self.0))
+impl QuickSort {
+    fn quick_sort(
+        &self,
+        data: &mut Vec<i32>,
+        low: i32,
+        high: i32,
+        scene: &Arc<Mutex<dyn Scene<Vec<i32>, SortingContext>>>,
+        running: &Arc<AtomicBool>,
+    ) {
+        if low < high {
+            let pi = self.partition(data, low, high, scene, running);
+            self.quick_sort(data, low, pi - 1, scene, running);
+            self.quick_sort(data, pi + 1, high, scene, running);
+        }
+    }
+
+    fn partition(
+        &self,
+        data: &mut Vec<i32>,
+        low: i32,
+        high: i32,
+        scene: &Arc<Mutex<dyn Scene<Vec<i32>, SortingContext>>>,
+        running: &Arc<AtomicBool>,
+    ) -> i32 {
+        let pivot = data[high as usize];
+        let mut i = low - 1;
+
+        for j in low..high {
+            if !running.load(Ordering::SeqCst) {
+                return 0;
+            }
+
+            if data[j as usize] < pivot {
+                i += 1;
+                data.swap(i as usize, j as usize);
+            }
+
+            // Update the scene for visualization
+            let context = SortingContext {
+                highlights: vec![i as usize, j as usize],
+                color: Color::Red,
+            };
+            scene.lock().unwrap().update(data, &context);
+        }
+
+        data.swap((i + 1) as usize, high as usize);
+
+        // Update the scene for visualization
+        let context = SortingContext {
+            highlights: vec![(i + 1) as usize, high as usize],
+            color: Color::Green,
+        };
+        scene.lock().unwrap().update(data, &context);
+
+        i + 1
     }
 }
 
-pub struct SharedBool(Arc<Mutex<bool>>);
+#[derive(Clone)]
+pub struct HeapSort;
 
-impl SharedBool {
-    pub fn new(value: bool) -> Self {
-        Self(Arc::new(Mutex::new(value)))
+impl Runnable<Vec<i32>, SortingContext> for HeapSort {
+    fn run(&self, data: &mut Vec<i32>, scene: Arc<Mutex<dyn Scene<Vec<i32>, SortingContext>>>, running: Arc<AtomicBool>) {
+        let n = data.len();
+        for i in (0..n / 2).rev() {
+            self.heapify(data, n, i, &scene, &running);
+        }
+
+        for i in (0..n).rev() {
+            if !running.load(Ordering::SeqCst) {
+                return;
+            }
+
+            data.swap(0, i);
+
+            // Update the scene for visualization
+            let context = SortingContext {
+                highlights: vec![0, i],
+                color: Color::Red,
+            };
+            scene.lock().unwrap().update(data, &context);
+
+            self.heapify(data, i, 0, &scene, &running);
+        }
     }
 
-    pub fn get(&self) -> bool {
-        *self.0.lock().unwrap()
+    fn clone_box(&self) -> Box<dyn Runnable<Vec<i32>, SortingContext>> {
+        Box::new(self.clone())
     }
 
-    pub fn set(&self, value: bool) {
-        let mut lock = self.0.lock().unwrap();
-        *lock = value;
+    fn as_any(&self) -> &dyn Any {
+        self
     }
 }
 
-impl Clone for SharedBool {
-    fn clone(&self) -> Self {
-        Self(Arc::clone(&self.0))
+impl HeapSort {
+    fn heapify(
+        &self,
+        data: &mut Vec<i32>,
+        n: usize,
+        i: usize,
+        scene: &Arc<Mutex<dyn Scene<Vec<i32>, SortingContext>>>,
+        running: &Arc<AtomicBool>,
+    ) {
+        let mut largest = i;
+        let left = 2 * i + 1;
+        let right = 2 * i + 2;
+
+        if left < n && data[left] > data[largest] {
+            largest = left;
+        }
+
+        if right < n && data[right] > data[largest] {
+            largest = right;
+        }
+
+        if largest != i {
+            data.swap(i, largest);
+
+            // Update the scene for visualization
+            let context = SortingContext {
+                highlights: vec![i, largest],
+                color: Color::Red,
+            };
+            scene.lock().unwrap().update(data, &context);
+
+            self.heapify(data, n, largest, scene, running);
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct ShellSort;
+
+impl Runnable<Vec<i32>, SortingContext> for ShellSort {
+    fn run(&self, data: &mut Vec<i32>, scene: Arc<Mutex<dyn Scene<Vec<i32>, SortingContext>>>, running: Arc<AtomicBool>) {
+        let n = data.len();
+        let mut gap = n / 2;
+
+        while gap > 0 {
+            for i in gap..n {
+                let temp = data[i];
+                let mut j = i;
+
+                while j >= gap && data[j - gap] > temp {
+                    if !running.load(Ordering::SeqCst) {
+                        return;
+                    }
+
+                    data[j] = data[j - gap];
+                    j -= gap;
+
+                    // Update the scene for visualization
+                    let context = SortingContext {
+                        highlights: vec![j, j + gap],
+                        color: Color::Red,
+                    };
+                    scene.lock().unwrap().update(data, &context);
+                }
+
+                data[j] = temp;
+            }
+
+            gap /= 2;
+        }
+    }
+
+    fn clone_box(&self) -> Box<dyn Runnable<Vec<i32>, SortingContext>> {
+        Box::new(self.clone())
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
     }
 }
