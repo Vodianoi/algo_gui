@@ -1,130 +1,62 @@
-use std::sync::atomic::AtomicBool;
-use std::sync::Arc;
-use std::sync::Mutex;
-use termsize;
+use console_engine::screen;
 
+use crate::menu::menu::Menu;
 use crate::algorithms::maze_generation::*;
-use crate::algorithms::pathfinding::*;
-use crate::data::data_structures::Maze;
-use crate::data::data_structures::MazeContext;
-use crate::data::data_structures::Runnable;
-use crate::data::data_structures::Runner;
-use crate::menu::{
-    alignment::Alignment, items::button::Button, items::dropdown::Dropdown, menu::Menu,
-    menu_item::MenuItem,
-};
+use crate::data::data_structures::{Maze, MazeContext, Runnable, Runner};
 use crate::scenes::maze_scene::MazeScene;
-use console_engine::ConsoleEngine;
+use std::sync::atomic::Ordering;
+use std::sync::{Arc, Mutex};
+use std::{cell, io};
 
-pub fn run_maze_menu(engine: &mut ConsoleEngine) {
-    // Define the dropdown items for maze generation and pathfinding algorithms
-    let maze_generation_items = vec![
-        "Recursive Backtracker".to_string(),
-        "Prims Algorithm".to_string(),
-        "Kruskals Algorithm".to_string(),
-        "Ellers Algorithm".to_string(),
-    ];
+pub fn run_maze_menu() -> io::Result<()> {
+    let mut menu = Menu::new(
+        "Maze Menu",
+        vec![
+            "Recursive Backtracker",
+            "Prims Algorithm",
+            "Kruskals Algorithm",
+            "Ellers Algorithm",
+            "Quit",
+        ],
+    );
 
-    let pathfinding_items = vec!["BFS".to_string(), "DFS".to_string()];
-
-    // Create dropdowns for selecting maze and pathfinding algorithms
-    let maze_dropdown = Box::new(Dropdown::new(22, maze_generation_items, 0, false, false));
-
-    let pathfinding_dropdown = Box::new(Dropdown::new(22, pathfinding_items, 0, false, false));
-
-    // Create the "Start" button
-    let start_button = Box::new(Button::new(20, 3, "Start".to_string()));
-
-    // Create the main menu with dropdowns and start button
-    let menu_items: Vec<Box<dyn MenuItem>> =
-        vec![maze_dropdown, pathfinding_dropdown, start_button];
-    let screen_size = termsize::get().unwrap();
-    let menu_width = screen_size.cols as i32 / 4;
-    let menu_height = screen_size.rows as i32 - 2;
-
-    let combined_menu = Menu::new(0, 0, menu_width, menu_height, menu_items, Alignment::Center);
-    let mut menu = Box::new(combined_menu);
-
-    loop {
-        engine.wait_frame();
-        engine.clear_screen();
-
-        // Draw and handle input for the menu
-        menu.draw(engine);
-        menu.handle_input(engine);
-        menu.handle_key_event(engine);
-
-        // Exit the loop if the user requests to quit
-        if menu._quit {
-            break;
+    menu.run(|selected_index, running| {
+        if selected_index == 4 {
+            // Quit
+            return Ok(());
         }
 
-        // Handle "Start" button confirmation
-        if menu.confirmed() {
-            menu.set_confirmed(false);
+        // Select the maze generation algorithm
+        let algorithm: Box<dyn Runnable<Maze, MazeContext>> = match selected_index {
+            0 => Box::new(RecursiveBacktracker),
+            1 => Box::new(PrimsAlgorithm),
+            2 => Box::new(KruskalAlgorithm),
+            3 => Box::new(EllerAlgorithm),
+            _ => return Ok(()), // Default case (shouldn't happen)
+        };
 
-            let form_values = menu.get_values();
-            let maze_algorithm = form_values[0].clone();
-            let pathfinding_algorithm = form_values[1].clone();
+        // Initialize the maze and scene
+        let size = termsize::get().unwrap();
+        let cell_size = 2;
+        let maze_width = (size.cols as usize / cell_size) - 2;
+        let maze_height = size.rows as usize / cell_size;
+        let maze = Maze::new(maze_width, maze_height);
+        let scene = Arc::new(Mutex::new(MazeScene::new(0,0, cell_size as i32)));
 
-            let screen_size = termsize::get().unwrap();
-            let display_width = screen_size.cols * 3 / 4 - 2;
-            let display_height = screen_size.rows;
+        // Create a runner to execute the algorithm and render the scene
+        let mut runner = Runner::new(vec![algorithm], scene.clone(), maze);
 
-            // Maze dimensions and scene setup
-            let maze_width = (display_width - 1) / 4;
-            let maze_height = (display_height - 1) / 2;
-            let maze = Maze::new(maze_width as usize, maze_height as usize);
-            let x = screen_size.cols as i32 - display_width as i32;
-            let y = 0;
-            let scene = Arc::new(Mutex::new(MazeScene::new(x, y, 2)));
+        // Start the maze generation process
+        runner.start();
 
-            // Maze generation algorithm selection
-            let maze_alg: Box<dyn Runnable<Maze, MazeContext>> = match maze_algorithm.as_str() {
-                "Recursive Backtracker" => Box::new(RecursiveBacktracker),
-                "Prims Algorithm" => Box::new(PrimsAlgorithm),
-                "Kruskals Algorithm" => Box::new(KruskalAlgorithm),
-                "Ellers Algorithm" => Box::new(EllerAlgorithm),
-                _ => Box::new(RecursiveBacktracker),
-            };
-
-            // Pathfinding algorithm selection
-            let path_alg: Box<dyn Runnable<Maze, MazeContext>> =
-                match pathfinding_algorithm.as_str() {
-                    "BFS" => Box::new(BFS),
-                    "DFS" => Box::new(DFS),
-                    _ => Box::new(BFS),
-                };
-
-            // Determine if running a maze generation or pathfinding algorithm
-            let running = Arc::new(AtomicBool::new(true));
-
-            // Start the selected algorithm
-            let algorithms = vec![maze_alg, path_alg];
-            let mut runner = Runner::new(algorithms, scene, maze);
-            runner.start(); // Start the algorithm in a separate thread
-
-            // Render the maze while the algorithm is running
-            while running.load(std::sync::atomic::Ordering::SeqCst) {
-                engine.wait_frame();
-                engine.clear_screen();
-
-                menu.draw(engine);
-                menu.handle_input(engine);
-                menu.handle_key_event(engine);
-
-                if menu._quit || menu.confirmed() {
-                    menu._quit = false;
-                    runner.stop();
-                    break;
-                }
-
-                runner.render(engine);
-
-                engine.draw();
-            }
+        let mut engine = console_engine::ConsoleEngine::init_fill(60).unwrap();
+        // Render the maze generation process
+        while runner.running.load(std::sync::atomic::Ordering::SeqCst) && running.load(Ordering::SeqCst) {
+            // Render the current state of the maze
+            runner.render(&mut engine);
+            engine.draw();
         }
 
-        engine.draw();
-    }
+        Ok(())
+    })
 }

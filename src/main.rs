@@ -31,6 +31,10 @@ mod menu {
         pub mod dropdown_menu;
         pub mod text;
     }
+
+    pub mod utils {
+        pub mod menu_utils;
+    }
 }
 
 
@@ -50,5 +54,9 @@ mod tests {
 }
 
 fn main() {
-    menu::factories::main_menu::main_menu();
+    // Clear screen
+    print!("\x1B[2J\x1B[1;1H");
+    if let Err(e) = menu::factories::main_menu::main_menu() {
+        eprintln!("Error: {}", e);
+    }
 }

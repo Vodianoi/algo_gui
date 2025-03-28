@@ -5,7 +5,7 @@ use console_engine::ConsoleEngine;
 use text_to_ascii_art::to_art;
 
 use crate::menu::menu_item::MenuItem;
-
+#[derive(Clone)]
 pub struct Button {
     pub x: i32,
     pub y: i32,
@@ -44,6 +44,7 @@ impl Button {
 
 }
 
+
 impl MenuItem for Button {
     fn draw(&self, engine: &mut ConsoleEngine) {
         let screeen_width = engine.get_width();
@@ -53,6 +54,10 @@ impl MenuItem for Button {
         } else {
             self.draw_standard(engine);
         }
+    }
+
+    fn clone_box(&self) -> Box<dyn MenuItem> {
+        Box::new(self.clone())
     }
 
     fn get_width(&self) -> i32 {

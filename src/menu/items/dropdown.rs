@@ -7,6 +7,7 @@ use console_engine::ConsoleEngine;
 
 use text_to_ascii_art::*;
 
+#[derive(Clone)]
 pub struct Dropdown {
     pub x: i32,
     pub y: i32,
@@ -56,6 +57,10 @@ impl MenuItem for Dropdown {
         } else {
             self.draw_standard(engine);
         }
+    }
+
+    fn clone_box(&self) -> Box<dyn MenuItem> {
+        Box::new(self.clone())
     }
 
     fn get_width(&self) -> i32 {
@@ -224,16 +229,3 @@ impl MenuItem for Dropdown {
     }
 }
 
-impl Clone for Dropdown {
-    fn clone(&self) -> Self {
-        Dropdown {
-            x: self.x,
-            y: self.y,
-            width: self.width,
-            options: self.options.clone(),
-            selected_index: self.selected_index,
-            is_open: self.is_open,
-            selected: self.selected,
-        }
-    }
-}

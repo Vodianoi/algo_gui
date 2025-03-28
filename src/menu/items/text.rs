@@ -5,11 +5,13 @@ use console_engine::ConsoleEngine;
 
 use text_to_ascii_art::*;
 
+#[derive(Clone)]
 pub struct Text {
     pub x: i32,
     pub y: i32,
     pub content: String,
 }
+
 
 impl MenuItem for Text {
     fn draw(&self, engine: &mut console_engine::ConsoleEngine) {
@@ -20,6 +22,10 @@ impl MenuItem for Text {
         } else {
             self.draw_standard(engine);
         }
+    }
+
+    fn clone_box(&self) -> Box<dyn MenuItem> {
+        Box::new(self.clone())
     }
 
     fn get_width(&self) -> i32 {
