@@ -1,8 +1,7 @@
 use crate::menu::{
-    alignment::Alignment, button::Button, maze_menu::run_maze_menu, menu::Menu,
-    pathfinding_menu::run_pathfinding_menu, sort_menu::run_sort_menu, text::Text,
+    alignment::Alignment, button::Button, maze_menu::run_maze_menu, menu::Menu, sort_menu::run_sort_menu, text::Text,
 };
-use console_engine::{ConsoleEngine, KeyCode, KeyModifiers};
+use console_engine::{ConsoleEngine, KeyCode};
 use termsize;
 
 pub fn main_menu() {

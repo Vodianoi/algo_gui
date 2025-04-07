@@ -1,6 +1,6 @@
 // src/menu/text.rs
 
-use crate::{algorithms::maze_generation::DynClone, menu::menu_item::MenuItem};
+use crate::menu::menu_item::MenuItem;
 use console_engine::ConsoleEngine;
 
 use text_to_ascii_art::*;

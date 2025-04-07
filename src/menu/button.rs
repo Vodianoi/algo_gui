@@ -1,10 +1,8 @@
 use console_engine::pixel;
 use console_engine::Color;
 use console_engine::ConsoleEngine;
-use console_engine::KeyCode;
 
-use text_to_ascii_art::Alignment;
-use text_to_ascii_art::{align, fonts, to_art};
+use text_to_ascii_art::to_art;
 
 use super::menu_item::MenuItem;
 

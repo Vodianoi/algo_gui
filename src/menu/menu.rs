@@ -1,6 +1,5 @@
 // Menu struct to create a menu with options (buttons)
 
-use std::borrow::Borrow;
 
 use crate::menu::alignment::Alignment;
 use crate::menu::button::Button;

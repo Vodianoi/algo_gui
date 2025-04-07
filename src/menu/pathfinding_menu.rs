@@ -1,12 +1,10 @@
-use std::sync::atomic::AtomicBool;
 
-use crate::algorithms::maze_generation::{Algorithm, AlgorithmRunner};
+use crate::algorithms::maze_generation::Algorithm;
 use crate::algorithms::pathfinding::*;
-use crate::menu::theme::default_theme;
 use crate::menu::{
     alignment::Alignment, button::Button, dropdown::Dropdown, menu::Menu, menu_item::MenuItem,
 };
-use console_engine::{ConsoleEngine, KeyCode};
+use console_engine::ConsoleEngine;
 
 // Run the pathfinding menu.
 // This function displays the pathfinding algorithms menu.
@@ -37,7 +35,7 @@ pub fn run_pathfinding_menu(engine: &mut ConsoleEngine) {
     // Create the main menu with the dropdown and back button
     let menu_items: Vec<Box<dyn MenuItem>> = vec![pathfinding_dropdown, back_button];
 
-    let mut pathfinding_menu = Menu::new(0, 0, 20, 10, menu_items, Alignment::Center);
+    let pathfinding_menu = Menu::new(0, 0, 20, 10, menu_items, Alignment::Center);
     // Create the menu handler
     let mut menu = Box::new(pathfinding_menu);
 
