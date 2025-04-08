@@ -110,7 +110,7 @@ fn handle_sorting(
 
     let data = generate_dataset(display_width, display_height);
     let algorithm = get_sorting_algorithm(&selected_algorithm);
-    let scene = Arc::new(Mutex::new(SortScene::new(data.clone(), x, y, 2)));
+    let scene = Arc::new(Mutex::new(SortScene::new(data.clone(), 2, x, y)));
     let mut runner = Runner::new(vec![algorithm], scene, data);
     let running = runner.running.clone();
 
