@@ -14,7 +14,7 @@ pub fn main_menu() {
     let screen_height = rows as u32;
 
     // Initialize the console engine with the full terminal size and 60 FPS
-    let mut engine = ConsoleEngine::init(screen_width, screen_height, 60).unwrap();
+    let mut engine = ConsoleEngine::init(screen_width, screen_height, 30).unwrap();
 
     // Define the main menu options using the new Button structure
     let menu_items: Vec<Box<dyn crate::menu::menu_item::MenuItem>> = vec![

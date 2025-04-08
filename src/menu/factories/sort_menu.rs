@@ -1,13 +1,15 @@
 use std::sync::Arc;
+use std::thread;
 
 use crate::algorithms::sorting::*;
 use crate::data::data_structures::{Runnable, Runner, SortingContext};
 use crate::menu::{
-    alignment::Alignment, items::button::Button, items::dropdown::Dropdown, menu::Menu, menu_item::MenuItem,
+    alignment::Alignment, items::button::Button, items::dropdown::Dropdown, menu::Menu,
+    menu_item::MenuItem,
 };
 use crate::scenes::sort_scene::SortScene;
-use std::sync::Mutex;
 use console_engine::ConsoleEngine;
+use std::sync::Mutex;
 
 pub fn run_sort_menu(engine: &mut ConsoleEngine) {
     let sort_items = get_sort_items();
@@ -15,11 +17,19 @@ pub fn run_sort_menu(engine: &mut ConsoleEngine) {
     let start_button = create_start_button();
 
     let menu_items: Vec<Box<dyn MenuItem>> = vec![sort_dropdown, start_button];
-    let (menu_width, menu_height, display_width, display_height, x, y) = calculate_dimensions(engine);
+    let (menu_width, menu_height, display_width, display_height, x, y) =
+        calculate_dimensions(engine);
 
     let mut sort_menu = Menu::new(0, 0, menu_width, menu_height, menu_items, Alignment::Center);
 
-    main_loop(engine, &mut sort_menu, display_width as usize, display_height as usize, x, y);
+    main_loop(
+        engine,
+        &mut sort_menu,
+        display_width as usize,
+        display_height as usize,
+        x,
+        y,
+    );
 }
 
 fn get_sort_items() -> Vec<String> {
@@ -36,8 +46,8 @@ fn get_sort_items() -> Vec<String> {
 
 fn create_sort_dropdown(sort_items: &[String]) -> Box<Dropdown> {
     Box::new(Dropdown {
-        x: 5,
-        y: 5,
+        x: 0,
+        y: 0,
         width: 22,
         options: sort_items.to_vec(),
         selected_index: 0,
@@ -48,8 +58,8 @@ fn create_sort_dropdown(sort_items: &[String]) -> Box<Dropdown> {
 
 fn create_start_button() -> Box<Button> {
     Box::new(Button {
-        x: 5,
-        y: 15,
+        x: 0,
+        y: 0,
         width: 20,
         height: 3,
         label: "Start".to_string(),
@@ -64,7 +74,7 @@ fn calculate_dimensions(engine: &ConsoleEngine) -> (i32, i32, u32, u32, i32, i32
     let display_width = screen.get_width() * 3 / 4 - 2;
     let display_height = screen.get_height() - 2;
     let x = screen.get_width() as i32 - display_width as i32;
-    let y = -2;
+    let y = 0;
     (menu_width, menu_height, display_width, display_height, x, y)
 }
 
@@ -110,7 +120,7 @@ fn handle_sorting(
 
     let data = generate_dataset(display_width, display_height);
     let algorithm = get_sorting_algorithm(&selected_algorithm);
-    let scene = Arc::new(Mutex::new(SortScene::new(data.clone(), 2, x, y)));
+    let scene = Arc::new(Mutex::new(SortScene::new(2, x, y)));
     let mut runner = Runner::new(vec![algorithm], scene, data);
     let running = runner.running.clone();
 
@@ -134,6 +144,7 @@ fn handle_sorting(
         runner.render(engine); // Pass indices to highlight here
 
         engine.draw();
+        
     }
 }
 

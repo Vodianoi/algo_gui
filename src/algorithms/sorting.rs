@@ -8,13 +8,18 @@ use std::{
 
 use console_engine::Color;
 
-use crate::data::data_structures::{Runnable, Scene, SortingContext};
+use crate::data::data_structures::{Runnable, Scene, SortHighlight, SortingContext};
 
 #[derive(Clone)]
 pub struct BubbleSort;
 
 impl Runnable<Vec<i32>, SortingContext> for BubbleSort {
-    fn run(&self, data: &mut Vec<i32>, scene: Arc<Mutex<dyn Scene<Vec<i32>, SortingContext>>>, running: Arc<AtomicBool>) {
+    fn run(
+        &self,
+        data: &mut Vec<i32>,
+        scene: Arc<Mutex<dyn Scene<Vec<i32>, SortingContext>>>,
+        running: Arc<AtomicBool>,
+    ) {
         for i in 0..data.len() {
             for j in 0..data.len() - i - 1 {
                 if !running.load(Ordering::SeqCst) {
@@ -26,13 +31,19 @@ impl Runnable<Vec<i32>, SortingContext> for BubbleSort {
                 }
 
                 // Update the scene for visualization
-                let context = SortingContext {
-                    highlights: vec![j, j + 1],
+                let hightlight = SortHighlight {
+                    indices: vec![j, j + 1],
                     color: Color::Red,
+                };
+                let context = SortingContext {
+                    highlights: vec![hightlight],
                 };
                 scene.lock().unwrap().update(data, &context);
             }
         }
+
+        // Final update for the sorted array
+        final_check(data, &scene);
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -48,7 +59,12 @@ impl Runnable<Vec<i32>, SortingContext> for BubbleSort {
 pub struct SelectionSort;
 
 impl Runnable<Vec<i32>, SortingContext> for SelectionSort {
-    fn run(&self, data: &mut Vec<i32>, scene: Arc<Mutex<dyn Scene<Vec<i32>, SortingContext>>>, running: Arc<AtomicBool>) {
+    fn run(
+        &self,
+        data: &mut Vec<i32>,
+        scene: Arc<Mutex<dyn Scene<Vec<i32>, SortingContext>>>,
+        running: Arc<AtomicBool>,
+    ) {
         for i in 0..data.len() {
             let mut min_index = i;
             for j in i + 1..data.len() {
@@ -64,12 +80,18 @@ impl Runnable<Vec<i32>, SortingContext> for SelectionSort {
             data.swap(i, min_index);
 
             // Update the scene for visualization
-            let context = SortingContext {
-                highlights: vec![i, min_index],
+            let hightlight = SortHighlight {
+                indices: vec![i, min_index],
                 color: Color::Red,
+            };
+            let context = SortingContext {
+                highlights: vec![hightlight],
             };
             scene.lock().unwrap().update(data, &context);
         }
+
+        // Final update for the sorted array
+        final_check(data, &scene);
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -85,7 +107,12 @@ impl Runnable<Vec<i32>, SortingContext> for SelectionSort {
 pub struct InsertionSort;
 
 impl Runnable<Vec<i32>, SortingContext> for InsertionSort {
-    fn run(&self, data: &mut Vec<i32>, scene: Arc<Mutex<dyn Scene<Vec<i32>, SortingContext>>>, running: Arc<AtomicBool>) {
+    fn run(
+        &self,
+        data: &mut Vec<i32>,
+        scene: Arc<Mutex<dyn Scene<Vec<i32>, SortingContext>>>,
+        running: Arc<AtomicBool>,
+    ) {
         for i in 1..data.len() {
             let key = data[i];
             let mut j = i;
@@ -98,14 +125,20 @@ impl Runnable<Vec<i32>, SortingContext> for InsertionSort {
                 j -= 1;
 
                 // Update the scene for visualization
-                let context = SortingContext {
-                    highlights: vec![j, j + 1],
+                let hightlight = SortHighlight {
+                    indices: vec![j, j + 1],
                     color: Color::Red,
+                };
+                let context = SortingContext {
+                    highlights: vec![hightlight],
                 };
                 scene.lock().unwrap().update(data, &context);
             }
             data[j] = key;
         }
+
+        // Final update for the sorted array
+        final_check(data, &scene);
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -121,10 +154,18 @@ impl Runnable<Vec<i32>, SortingContext> for InsertionSort {
 pub struct MergeSort;
 
 impl Runnable<Vec<i32>, SortingContext> for MergeSort {
-    fn run(&self, data: &mut Vec<i32>, scene: Arc<Mutex<dyn Scene<Vec<i32>, SortingContext>>>, running: Arc<AtomicBool>) {
+    fn run(
+        &self,
+        data: &mut Vec<i32>,
+        scene: Arc<Mutex<dyn Scene<Vec<i32>, SortingContext>>>,
+        running: Arc<AtomicBool>,
+    ) {
         let n = data.len();
         let mut temp = data.clone();
         self.merge_sort(data, &mut temp, 0, n - 1, &scene, &running);
+
+        // Final update for the sorted array
+        final_check(data, &scene);
     }
 
     fn clone_box(&self) -> Box<dyn Runnable<Vec<i32>, SortingContext>> {
@@ -170,6 +211,20 @@ impl MergeSort {
         let mut j = mid + 1;
         let mut k = left;
 
+        // Highlight the subarrays being merged
+        let highlights: Vec<SortHighlight> = (left..=mid)
+            .map(|index| SortHighlight {
+                indices: vec![index],
+                color: Color::Blue,
+            })
+            .chain((mid + 1..=right).map(|index| SortHighlight {
+                indices: vec![index],
+                color: Color::Yellow,
+            }))
+            .collect();
+        let context = SortingContext { highlights };
+        scene.lock().unwrap().update(data, &context);
+
         while i <= mid && j <= right {
             if !running.load(Ordering::SeqCst) {
                 return;
@@ -181,8 +236,15 @@ impl MergeSort {
             } else {
                 temp[k] = data[j];
                 j += 1;
+                let highlight = SortHighlight {
+                    indices: if k > 0 { vec![k - 1] } else { vec![] },
+                    color: Color::Red,
+                };
+                let context = SortingContext {
+                    highlights: vec![highlight],
+                };
+                scene.lock().unwrap().update(data, &context);
             }
-
             k += 1;
         }
 
@@ -190,6 +252,15 @@ impl MergeSort {
             temp[k] = data[i];
             i += 1;
             k += 1;
+
+            let highlight = SortHighlight {
+                indices: vec![k - 1],
+                color: Color::Red,
+            };
+            let context = SortingContext {
+                highlights: vec![highlight],
+            };
+            scene.lock().unwrap().update(data, &context);
         }
 
         while j <= right {
@@ -202,12 +273,35 @@ impl MergeSort {
             data[i] = temp[i];
         }
 
-        // Update the scene for visualization
+        let hightlight = SortHighlight {
+            indices: vec![k - 1],
+            color: Color::Red,
+        };
+        let highlights: Vec<SortHighlight> = (left..=right)
+            .map(|index| SortHighlight {
+                indices: vec![index],
+                color: Color::Green,
+            })
+            .collect();
+        let concatenated_highlights = highlights
+            .into_iter()
+            .chain(vec![hightlight])
+            .collect::<Vec<_>>();
         let context = SortingContext {
-            highlights: (left..=right).collect(),
-            color: Color::Green,
+            highlights: concatenated_highlights,
         };
         scene.lock().unwrap().update(data, &context);
+        // }
+
+        // // Final update for the merged subarray
+        // let hightlight = SortHighlight {
+        //     indices: (left..=right).collect(),
+        //     color: Color::Green,
+        // };
+        // let context = SortingContext {
+        //     highlights: vec![hightlight],
+        // };
+        // scene.lock().unwrap().update(data, &context);
     }
 }
 
@@ -215,9 +309,16 @@ impl MergeSort {
 pub struct QuickSort;
 
 impl Runnable<Vec<i32>, SortingContext> for QuickSort {
-    fn run(&self, data: &mut Vec<i32>, scene: Arc<Mutex<dyn Scene<Vec<i32>, SortingContext>>>, running: Arc<AtomicBool>) {
+    fn run(
+        &self,
+        data: &mut Vec<i32>,
+        scene: Arc<Mutex<dyn Scene<Vec<i32>, SortingContext>>>,
+        running: Arc<AtomicBool>,
+    ) {
         let high = data.len() as i32 - 1;
         self.quick_sort(data, 0, high, &scene, &running);
+        // Final update for the sorted array
+        final_check(data, &scene);
     }
 
     fn clone_box(&self) -> Box<dyn Runnable<Vec<i32>, SortingContext>> {
@@ -267,9 +368,12 @@ impl QuickSort {
             }
 
             // Update the scene for visualization
-            let context = SortingContext {
-                highlights: vec![i as usize, j as usize],
+            let highlight = SortHighlight {
+                indices: vec![i as usize, j as usize],
                 color: Color::Red,
+            };
+            let context = SortingContext {
+                highlights: vec![highlight],
             };
             scene.lock().unwrap().update(data, &context);
         }
@@ -277,9 +381,12 @@ impl QuickSort {
         data.swap((i + 1) as usize, high as usize);
 
         // Update the scene for visualization
+        let highlight = SortHighlight {
+            indices: vec![(i + 1) as usize, high as usize],
+            color: Color::Red,
+        };
         let context = SortingContext {
-            highlights: vec![(i + 1) as usize, high as usize],
-            color: Color::Green,
+            highlights: vec![highlight],
         };
         scene.lock().unwrap().update(data, &context);
 
@@ -291,7 +398,12 @@ impl QuickSort {
 pub struct HeapSort;
 
 impl Runnable<Vec<i32>, SortingContext> for HeapSort {
-    fn run(&self, data: &mut Vec<i32>, scene: Arc<Mutex<dyn Scene<Vec<i32>, SortingContext>>>, running: Arc<AtomicBool>) {
+    fn run(
+        &self,
+        data: &mut Vec<i32>,
+        scene: Arc<Mutex<dyn Scene<Vec<i32>, SortingContext>>>,
+        running: Arc<AtomicBool>,
+    ) {
         let n = data.len();
         for i in (0..n / 2).rev() {
             self.heapify(data, n, i, &scene, &running);
@@ -305,14 +417,20 @@ impl Runnable<Vec<i32>, SortingContext> for HeapSort {
             data.swap(0, i);
 
             // Update the scene for visualization
-            let context = SortingContext {
-                highlights: vec![0, i],
+            let highlight = SortHighlight {
+                indices: vec![0, i],
                 color: Color::Red,
+            };
+            let context = SortingContext {
+                highlights: vec![highlight],
             };
             scene.lock().unwrap().update(data, &context);
 
             self.heapify(data, i, 0, &scene, &running);
         }
+
+        // Final update for the sorted array
+        final_check(data, &scene);
     }
 
     fn clone_box(&self) -> Box<dyn Runnable<Vec<i32>, SortingContext>> {
@@ -349,9 +467,12 @@ impl HeapSort {
             data.swap(i, largest);
 
             // Update the scene for visualization
-            let context = SortingContext {
-                highlights: vec![i, largest],
+            let highlight = SortHighlight {
+                indices: vec![i, largest],
                 color: Color::Red,
+            };
+            let context = SortingContext {
+                highlights: vec![highlight],
             };
             scene.lock().unwrap().update(data, &context);
 
@@ -364,7 +485,12 @@ impl HeapSort {
 pub struct ShellSort;
 
 impl Runnable<Vec<i32>, SortingContext> for ShellSort {
-    fn run(&self, data: &mut Vec<i32>, scene: Arc<Mutex<dyn Scene<Vec<i32>, SortingContext>>>, running: Arc<AtomicBool>) {
+    fn run(
+        &self,
+        data: &mut Vec<i32>,
+        scene: Arc<Mutex<dyn Scene<Vec<i32>, SortingContext>>>,
+        running: Arc<AtomicBool>,
+    ) {
         let n = data.len();
         let mut gap = n / 2;
 
@@ -382,9 +508,12 @@ impl Runnable<Vec<i32>, SortingContext> for ShellSort {
                     j -= gap;
 
                     // Update the scene for visualization
-                    let context = SortingContext {
-                        highlights: vec![j, j + gap],
+                    let highlight = SortHighlight {
+                        indices: vec![j, j + gap],
                         color: Color::Red,
+                    };
+                    let context = SortingContext {
+                        highlights: vec![highlight],
                     };
                     scene.lock().unwrap().update(data, &context);
                 }
@@ -394,6 +523,9 @@ impl Runnable<Vec<i32>, SortingContext> for ShellSort {
 
             gap /= 2;
         }
+
+        // Final update for the sorted array
+        final_check(data, &scene);
     }
 
     fn clone_box(&self) -> Box<dyn Runnable<Vec<i32>, SortingContext>> {
@@ -402,5 +534,36 @@ impl Runnable<Vec<i32>, SortingContext> for ShellSort {
 
     fn as_any(&self) -> &dyn Any {
         self
+    }
+}
+
+// Util function to highlight final sorted array
+pub fn final_check(data: &Vec<i32>, scene: &Arc<Mutex<dyn Scene<Vec<i32>, SortingContext>>>) {
+    let mut highlights = Vec::new();
+    let mut is_sorted = true;
+
+    for i in 0..data.len() {
+        if i > 0 && data[i] < data[i - 1] {
+            highlights.push(SortHighlight {
+                indices: vec![i],
+                color: Color::Red,
+            });
+            is_sorted = false;
+        } else {
+            highlights.push(SortHighlight {
+                indices: vec![i],
+                color: Color::Green,
+            });
+        }
+
+        // Update the scene at each step
+        let context = SortingContext {
+            highlights: highlights.clone(),
+        };
+        scene.lock().unwrap().update(data, &context);
+    }
+
+    if !is_sorted {
+        return; // Data is not sorted
     }
 }

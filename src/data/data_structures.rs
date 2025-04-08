@@ -473,10 +473,15 @@ impl VisualizationContext for MazeContext {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct SortHighlight {
+    pub indices: Vec<usize>,
+    pub color: Color,
+}
+
 #[derive(Clone)]
 pub struct SortingContext {
-    pub highlights: Vec<usize>,
-    pub color: Color,
+    pub highlights: Vec<SortHighlight>,
 }
 
 impl VisualizationContext for SortingContext {
