@@ -197,9 +197,9 @@ impl Menu {
                     self.confirmed = true;
                 }
             }
-            if engine.is_key_pressed(console_engine::KeyCode::Up) {
+            if engine.is_key_pressed(console_engine::KeyCode::Up) || engine.is_key_pressed(console_engine::KeyCode::Char('k')) {
                 self.previous_selectable();
-            } else if engine.is_key_pressed(console_engine::KeyCode::Down) {
+            } else if engine.is_key_pressed(console_engine::KeyCode::Down) || engine.is_key_pressed(console_engine::KeyCode::Char('j')) {
                 self.next_selectable();
             }
         }
