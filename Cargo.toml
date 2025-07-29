@@ -4,7 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-console_engine = "2.6.1"
 rand = "0.8.5"
-termsize = "0.1.9"
-text-to-ascii-art = "0.1.10"
+ratatui = "0.23"
+crossterm = "0.26"
