@@ -8,6 +8,12 @@ pub const VISITED_CHAR: char = '.';
 pub const GOAL_CHAR: char = 'G';
 pub const START_CHAR: char = 'S';
 
+// Indices for wall directions in the `walls` array of a `Cell`
+pub const NORTH: usize = 0;
+pub const SOUTH: usize = 1;
+pub const WEST: usize = 2;
+pub const EAST: usize = 3;
+
 pub struct Maze {
     pub width: usize,
     pub height: usize,
@@ -90,17 +96,21 @@ impl Maze {
         let dx = nx - x;
         let dy = ny - y;
         if dx == 1 {
-            self.get_cell_mut(x, y).walls[1] = false;
-            self.get_cell_mut(nx, ny).walls[3] = false;
+            // remove east wall of the current cell and west wall of the neighbour
+            self.get_cell_mut(x, y).walls[EAST] = false;
+            self.get_cell_mut(nx, ny).walls[WEST] = false;
         } else if dx == -1 {
-            self.get_cell_mut(x, y).walls[3] = false;
-            self.get_cell_mut(nx, ny).walls[1] = false;
+            // remove west wall of the current cell and east wall of the neighbour
+            self.get_cell_mut(x, y).walls[WEST] = false;
+            self.get_cell_mut(nx, ny).walls[EAST] = false;
         } else if dy == 1 {
-            self.get_cell_mut(x, y).walls[2] = false;
-            self.get_cell_mut(nx, ny).walls[0] = false;
+            // remove south wall of the current cell and north wall of the neighbour
+            self.get_cell_mut(x, y).walls[SOUTH] = false;
+            self.get_cell_mut(nx, ny).walls[NORTH] = false;
         } else if dy == -1 {
-            self.get_cell_mut(x, y).walls[0] = false;
-            self.get_cell_mut(nx, ny).walls[2] = false;
+            // remove north wall of the current cell and south wall of the neighbour
+            self.get_cell_mut(x, y).walls[NORTH] = false;
+            self.get_cell_mut(nx, ny).walls[SOUTH] = false;
         }
 
         self.get_cell_mut(x, y).c = EMPTY_CHAR;
@@ -173,15 +183,15 @@ impl Cell {
     }
 
     pub fn has_wall_north(&self) -> bool {
-        self.walls[0]
+        self.walls[NORTH]
     }
     pub fn has_wall_south(&self) -> bool {
-        self.walls[1]
+        self.walls[SOUTH]
     }
     pub fn has_wall_west(&self) -> bool {
-        self.walls[2]
+        self.walls[WEST]
     }
     pub fn has_wall_east(&self) -> bool {
-        self.walls[3]
+        self.walls[EAST]
     }
 }
