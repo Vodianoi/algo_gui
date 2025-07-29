@@ -15,7 +15,6 @@ pub const COLORED: bool = true;
 pub struct RecursiveBacktracker;
 
 impl RecursiveBacktracker {
-
     pub const SETTINGS: MazeSettings = MazeSettings {
         bfs: false,
         colored: COLORED,
@@ -25,7 +24,12 @@ impl RecursiveBacktracker {
 }
 
 impl Runnable<Maze, MazeContext> for RecursiveBacktracker {
-    fn run(&self, maze: &mut Maze, scene: Arc<Mutex<dyn Scene<Maze, MazeContext>>>, running: Arc<AtomicBool>) {
+    fn run(
+        &self,
+        maze: &mut Maze,
+        scene: Arc<Mutex<dyn Scene<Maze, MazeContext>>>,
+        running: Arc<AtomicBool>,
+    ) {
         let mut rng = rand::thread_rng();
 
         let width = maze.width;
@@ -34,12 +38,14 @@ impl Runnable<Maze, MazeContext> for RecursiveBacktracker {
         let mut visited: Vec<Vec<bool>> = vec![vec![false; width]; height];
         let mut current = (rng.gen_range(0..width), rng.gen_range(0..height));
         visited[current.1][current.0] = true;
-        maze.get_cell_mut(current.0 as i32, current.1 as i32).visited = true;
+        maze.get_cell_mut(current.0 as i32, current.1 as i32)
+            .visited = true;
 
         stack.push(current);
         while running.load(Ordering::SeqCst) && !stack.is_empty() {
             let neighbor = choose_random_neighbor(current, width, height, &visited);
-            maze.get_cell_mut(current.0 as i32, current.1 as i32).visited = true;
+            maze.get_cell_mut(current.0 as i32, current.1 as i32)
+                .visited = true;
             match neighbor {
                 Some(next) => {
                     let (nx, ny) = next;
@@ -50,7 +56,11 @@ impl Runnable<Maze, MazeContext> for RecursiveBacktracker {
 
                     // Update the scene for visualization
                     let context = MazeContext {
-                        path: stack.clone().into_iter().map(|(x, y)| (x as i32, y as i32)).collect(),
+                        path: stack
+                            .clone()
+                            .into_iter()
+                            .map(|(x, y)| (x as i32, y as i32))
+                            .collect(),
                         settings: Self::SETTINGS,
                     };
                     scene.lock().unwrap().update(maze, &context);
@@ -85,7 +95,6 @@ impl Runnable<Maze, MazeContext> for RecursiveBacktracker {
 pub struct KruskalAlgorithm;
 
 impl KruskalAlgorithm {
-
     pub const SETTINGS: MazeSettings = MazeSettings {
         bfs: false,
         colored: COLORED,
@@ -95,7 +104,12 @@ impl KruskalAlgorithm {
 }
 
 impl Runnable<Maze, MazeContext> for KruskalAlgorithm {
-    fn run(&self, maze: &mut Maze, scene: Arc<Mutex<dyn Scene<Maze, MazeContext>>>, running: Arc<AtomicBool>) {
+    fn run(
+        &self,
+        maze: &mut Maze,
+        scene: Arc<Mutex<dyn Scene<Maze, MazeContext>>>,
+        running: Arc<AtomicBool>,
+    ) {
         let mut rng = rand::thread_rng();
         let width = maze.width;
         let height = maze.height;
@@ -106,7 +120,8 @@ impl Runnable<Maze, MazeContext> for KruskalAlgorithm {
         for y in 0..height {
             for x in 0..width {
                 sets.push(vec![(x, y)]);
-                maze.get_cell_mut(x as i32, y as i32).value = (y * width + x) as i32; // Assign initial unique value
+                maze.get_cell_mut(x as i32, y as i32).value = (y * width + x) as i32;
+                // Assign initial unique value
             }
         }
 
@@ -144,20 +159,26 @@ impl Runnable<Maze, MazeContext> for KruskalAlgorithm {
                 }
 
                 // Update the scene for visualization
-                scene.lock().unwrap().update(maze, &MazeContext {
-                    path: vec![],
-                    settings: Self::SETTINGS,
-                });
+                scene.lock().unwrap().update(
+                    maze,
+                    &MazeContext {
+                        path: vec![],
+                        settings: Self::SETTINGS,
+                    },
+                );
             }
         }
 
         // Final cleanup
         maze.clear_path();
         maze.clear_values();
-        scene.lock().unwrap().update(maze, &MazeContext {
-            path: vec![],
-            settings: Self::SETTINGS,
-        });
+        scene.lock().unwrap().update(
+            maze,
+            &MazeContext {
+                path: vec![],
+                settings: Self::SETTINGS,
+            },
+        );
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -173,7 +194,6 @@ impl Runnable<Maze, MazeContext> for KruskalAlgorithm {
 pub struct PrimsAlgorithm;
 
 impl PrimsAlgorithm {
-
     pub const SETTINGS: MazeSettings = MazeSettings {
         bfs: false,
         colored: COLORED,
@@ -195,7 +215,12 @@ impl PrimsAlgorithm {
 //
 // Uses Graph data structure to represent the maze
 impl Runnable<Maze, MazeContext> for PrimsAlgorithm {
-    fn run(&self, maze: &mut Maze, scene: Arc<Mutex<dyn Scene<Maze, MazeContext>>>, running: Arc<AtomicBool>) {
+    fn run(
+        &self,
+        maze: &mut Maze,
+        scene: Arc<Mutex<dyn Scene<Maze, MazeContext>>>,
+        running: Arc<AtomicBool>,
+    ) {
         let mut rng = rand::thread_rng();
 
         // Initialize the walls list with the start cell's neighbors
@@ -262,7 +287,6 @@ impl Runnable<Maze, MazeContext> for PrimsAlgorithm {
 pub struct EllerAlgorithm;
 
 impl EllerAlgorithm {
-
     pub const SETTINGS: MazeSettings = MazeSettings {
         bfs: false,
         colored: COLORED,
@@ -272,7 +296,12 @@ impl EllerAlgorithm {
 }
 
 impl Runnable<Maze, MazeContext> for EllerAlgorithm {
-    fn run(&self, maze: &mut Maze,  scene: Arc<Mutex<dyn Scene<Maze, MazeContext>>>, running: Arc<AtomicBool>) {
+    fn run(
+        &self,
+        maze: &mut Maze,
+        scene: Arc<Mutex<dyn Scene<Maze, MazeContext>>>,
+        running: Arc<AtomicBool>,
+    ) {
         let mut rng = rand::thread_rng();
 
         let width = maze.width;
@@ -371,7 +400,8 @@ impl Runnable<Maze, MazeContext> for EllerAlgorithm {
             path: vec![],
             settings: Self::SETTINGS,
         };
-        update_maze(&scene, &maze, &context);    }
+        update_maze(&scene, &maze, &context);
+    }
 
     fn as_any(&self) -> &dyn Any {
         self
@@ -424,6 +454,10 @@ fn choose_random_neighbor(
     }
 }
 
-fn update_maze(scene: &Arc<Mutex<dyn Scene<Maze, MazeContext>>>, maze: &Maze, context: &MazeContext) {
+fn update_maze(
+    scene: &Arc<Mutex<dyn Scene<Maze, MazeContext>>>,
+    maze: &Maze,
+    context: &MazeContext,
+) {
     scene.lock().unwrap().update(maze, context);
 }
