@@ -6,7 +6,7 @@ use std::{
     },
 };
 
-use console_engine::Color;
+use ratatui::style::Color;
 
 use crate::data::data_structures::{Runnable, Scene, SortHighlight, SortingContext};
 

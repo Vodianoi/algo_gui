@@ -10,9 +10,13 @@ use std::{
     thread,
 };
 
-use console_engine::{Color, ConsoleEngine};
-use rand::{random, Rng};
+use ratatui::backend::CrosstermBackend;
+use ratatui::style::Color;
+use ratatui::Frame;
 
+pub type BackendType = CrosstermBackend<std::io::Stdout>;
+pub type FrameType<'a> = ratatui::Frame<'a, BackendType>;
+use rand::{random, Rng};
 
 pub const EMPTY_CHAR: char = ' ';
 pub const WALL_CHAR: char = '#';
@@ -21,7 +25,7 @@ pub const PATH_CHAR: char = ' ';
 pub const GOAL_CHAR: char = 'G';
 pub const START_CHAR: char = 'S';
 
-#[derive(Clone,PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct Maze {
     pub width: usize,
     pub height: usize,
@@ -44,8 +48,14 @@ impl Maze {
             cells.push(row);
         });
 
-        let start = (random::<usize>() % width as usize, random::<usize>() % height as usize);
-        let goal =  (random::<usize>() % width as usize, random::<usize>() % height as usize);
+        let start = (
+            random::<usize>() % width as usize,
+            random::<usize>() % height as usize,
+        );
+        let goal = (
+            random::<usize>() % width as usize,
+            random::<usize>() % height as usize,
+        );
 
         Maze {
             width,
@@ -251,7 +261,7 @@ impl Debug for Maze {
     }
 }
 
-#[derive(Clone,PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct Cell {
     pub walls: [bool; 4],
     pub visited: bool,
@@ -326,7 +336,7 @@ pub trait Runnable<T: Send + Sync, C: VisualizationContext>: Send + Sync {
 
 impl<T: Send + Sync, F, C: VisualizationContext> Runnable<T, C> for F
 where
-    F: 'static + Send + Sync + Clone + Fn(&mut T, Arc<Mutex<dyn Scene<T,C>>>, Arc<AtomicBool>),
+    F: 'static + Send + Sync + Clone + Fn(&mut T, Arc<Mutex<dyn Scene<T, C>>>, Arc<AtomicBool>),
 {
     fn run(&self, data: &mut T, scene: Arc<Mutex<dyn Scene<T, C>>>, running: Arc<AtomicBool>) {
         self(data, scene, running);
@@ -341,7 +351,7 @@ where
     }
 }
 
-impl<T: Send + Sync,C: VisualizationContext> Clone for Box<dyn Runnable<T, C>> {
+impl<T: Send + Sync, C: VisualizationContext> Clone for Box<dyn Runnable<T, C>> {
     fn clone(&self) -> Box<dyn Runnable<T, C>> {
         self.clone_box()
     }
@@ -349,7 +359,7 @@ impl<T: Send + Sync,C: VisualizationContext> Clone for Box<dyn Runnable<T, C>> {
 
 // Common trait for scenes (MazeScene, SortScene, etc.)
 pub trait Scene<T, C>: Send + Sync + Any {
-    fn render(&mut self, engine: &mut ConsoleEngine);
+    fn render(&mut self, f: &mut FrameType<'_>);
     fn update(&mut self, data: &T, context: &C);
     fn as_any(&self) -> &dyn Any;
 }
@@ -362,12 +372,8 @@ impl<T: 'static, C: 'static> SharedScene<T, C> {
         Self(scene)
     }
 
-    pub fn render(&self, engine: &mut ConsoleEngine)
-    where
-        T: 'static,
-        C: 'static,
-    {
-        self.0.lock().unwrap().render(engine);
+    pub fn render(&self, f: &mut FrameType<'_>) {
+        self.0.lock().unwrap().render(f);
     }
 
     pub fn update(&self, data: &T, context: &C) {
@@ -395,7 +401,11 @@ where
     T: 'static + Send + Sync,
     C: 'static + VisualizationContext,
 {
-    pub fn new(tasks: Vec<Box<dyn Runnable<T, C>>>, scene: Arc<Mutex<dyn Scene<T, C>>>, data: T) -> Self {
+    pub fn new(
+        tasks: Vec<Box<dyn Runnable<T, C>>>,
+        scene: Arc<Mutex<dyn Scene<T, C>>>,
+        data: T,
+    ) -> Self {
         Runner {
             tasks,
             current_task: Arc::new(AtomicUsize::new(0)),
@@ -432,11 +442,10 @@ where
         self.running.store(false, Ordering::SeqCst);
     }
 
-    pub fn render(&mut self, engine: &mut ConsoleEngine) {
-        self.scene.render(engine);
+    pub fn render(&mut self, f: &mut FrameType<'_>) {
+        self.scene.render(f);
     }
 }
-
 
 pub trait VisualizationContext: Send + Sync {
     fn as_any(&self) -> &dyn Any;
